@@ -7,4 +7,4 @@
 
 cat /boot/System.map-`uname -r` | 
 	grep -P "\s+[RDT]+\s" |
-	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define \3 \1/g' >>sysmap.h
+	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >>sysmap.h
