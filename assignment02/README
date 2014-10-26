@@ -1,1 +1,18 @@
-TODO
+Files inside :
+        1. keylogger.c - LKM
+        2. gensysmap.sh - bash script to generate sysmap.h
+        3. Makefile
+        4. README
+
+How to?
+
+
+1. Build kernel module
+        $ make
+        > keylogger.ko and other object files will be generated
+
+2. Load the keylogger.ko
+        $ insmod keylogger.ko
+
+3. Keystrokes will be logged in syslog
+ 	> you can verify using $ dmesg
