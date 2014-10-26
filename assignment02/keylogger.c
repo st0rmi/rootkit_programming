@@ -6,7 +6,6 @@
 #include <linux/kernel.h>
 #include <asm/page.h>
 #include "sysmap.h"
-#include <linux/moduleparam.h>
 #include <linux/unistd.h>
 
 void **sys_call_table;
