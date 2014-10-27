@@ -2,11 +2,15 @@
  * Assignment 02 for the course Rootkit Programming at TUM in WS2014/15.
  * Implemented by Guru Chandrasekhara and Martin Herrmann.
  */
-#include <linux/module.h>
-#include <linux/kernel.h>
 #include <asm/page.h>
-#include "sysmap.h"
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/kernel.h>
 #include <linux/unistd.h>
+#include <linux/init.h>
+#include <linux/stat.h>
+
+#include "sysmap.h"
 
 /* Information for modinfo */
 MODULE_LICENSE("GPL");
@@ -15,40 +19,20 @@ MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 
 
 /* Define module parameters */
+static int hideprocess_processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 static int hideprocess_argcount = 0;
-static pid_t hideprocess_processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-module_param_array(hideprocess_processes, pid_t, hideprocess_argcount, 0000);
+module_param_array(hideprocess_processes, int, &hideprocess_argcount, 0000);
 MODULE_PARM_DESC(hideprocess_processes, "An array of process ids to hide");
 
-
-
 /*
- * Disable the writing protection for the whole processor.
+ * Tries hiding a specific process identified by its pid from the user.
+ * Returns 0 on success, 1 on failure.
  */
-static void disable_page_protection (void)
-{
-	unsigned long value;
-	asm volatile("mov %%cr0,%0" : "=r" (value));
-	if (value & 0x00010000)
-	{
-		value &= ~0x00010000;
-		asm volatile("mov %0,%%cr0": : "r" (value));
-	}
-}
-
-/*
- * Reenable the writing protection for the whole processor.
- */
-static void enable_page_protection (void)
-{
-	unsigned long value;
-	asm volatile("mov %%cr0,%0" : "=r" (value));
-	if (!(value & 0x00010000))
-	{
-		value |= 0x00010000;
-		asm volatile("mov %0,%%cr0": : "r" (value));
-    	}
+int hide_process(pid_t pid) {
+	// TODO:
+	// see http://phrack.org/issues/63/18.html
+	return 1;
 }
 
 /*
@@ -58,6 +42,9 @@ static void enable_page_protection (void)
 int init_module (void)
 {
 	printk(KERN_INFO "Loading process-hider LKM...\n");
+	
+	/* check if each process provided by the user is running */
+	// TODO: call hide_process(pid);
 	
 	return 0;
 }
