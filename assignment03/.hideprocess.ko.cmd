@@ -1,0 +1,1 @@
+cmd_/home/martin/rootkit_programming/assignment03/hideprocess.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/martin/rootkit_programming/assignment03/hideprocess.ko /home/martin/rootkit_programming/assignment03/hideprocess.o /home/martin/rootkit_programming/assignment03/hideprocess.mod.o

