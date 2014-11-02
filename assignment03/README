@@ -1,1 +1,32 @@
-TODO
+Module Description: 
+
+This kernel module hides the processes, which are specified by the user while loading the module. 
+User has to give inputs between 1-16 process ids.   
+ 
+
+Files inside :
+        1. hideprocess.c - LKM
+        2. gensysmap.sh - bash script to generate sysmap.h
+        3. Makefile
+        4. README
+
+How to?
+
+
+1. Build kernel module
+        $ make
+        > hideprocess.ko and other object files will be generated
+
+2. (Optional step)
+   Check number of processes running in the system,
+	$ ps aux|wc -l
+   and list processes,
+	$ls /proc
+ 
+3. Load the hideprocess.ko and input the process numbers which kernel module wants to hide. 
+	For example,
+        $ insmod keylogger.ko processes=2,18,4
+	
+4. Check if the process is hidden,
+	$ls /proc
+   You can verify by counting processes again.
