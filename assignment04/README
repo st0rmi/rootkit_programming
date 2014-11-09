@@ -1,32 +1,33 @@
 Module Description: 
 
-This kernel module hides the processes, which are specified by the user while loading the module. 
-User has to give inputs between 1-16 process ids.   
+This kernel module hides all files starting with 'rootkit_' or '.rootkit_'. The latter was added because some
+applications create temporary files starting with a '.' (I'm looking at you, vim). Symlinks to files with such
+prefixes will also be hidden.
  
 
 Files inside :
-        1. hideprocess.c - LKM
+        1. hidefiles.c - LKM
         2. gensysmap.sh - bash script to generate sysmap.h
-        3. Makefile
-        4. README
+        3. Makefile - the Makefile
+        4. README - what you are reading right now
 
-How to?
+How to:
 
 
-1. Build kernel module
+1. Build the LMK.
         $ make
-        > hideprocess.ko and other object files will be generated
+        > hidefile.ko and other object files will be generated.
 
 2. (Optional step)
-   Check number of processes running in the system,
-	$ ps aux|wc -l
-   and list processes,
-	$ls /proc
+	$ echo "I'm hidden!" > rootkit_hidden
+	$ ln -s ./rootkit_hidden symlink_to_hidden
+	$ ls -alh
+	> Create a file that should be hidden after the LKM has been loaded. Also add a
+	> symlink to it. Check that you are able to see them.
  
-3. Load the hideprocess.ko and input the process numbers which kernel module wants to hide. 
-	For example,
-        $ insmod keylogger.ko processes=2,18,4
+3. Load the hidefiles.ko LKM. 
+        $ insmod hidefiles.ko 
 	
-4. Check if the process is hidden,
-	$ls /proc
-   You can verify by counting processes again.
+4. Check if the files are hidden.
+	$ ls -alh
+   	> You can verify that the specified files and symlinks to these are hidden.
