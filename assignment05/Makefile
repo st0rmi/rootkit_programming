@@ -1,4 +1,4 @@
-obj-m += hidefile.o
+obj-m += hidemodule.o
 
 all:
 	./gensysmap.sh
