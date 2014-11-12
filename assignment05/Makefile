@@ -1,4 +1,6 @@
-obj-m += hidemodule.o
+obj-m += rootkit_group4.o
+rootkit_group4-y := main.o include.o getdents.o
+ccflags-y = -std=gnu99 -Wno-declaration-after-statement
 
 all:
 	./gensysmap.sh
