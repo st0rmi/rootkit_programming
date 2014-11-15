@@ -1,4 +1,4 @@
-obj-m += works.o
+obj-m += hidemodule.o
 
 all:
 	./gensysmap.sh
