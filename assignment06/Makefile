@@ -1,4 +1,4 @@
-obj-m += hidemodule.o
+obj-m += hidesocket.o
 
 all:
 	./gensysmap.sh
