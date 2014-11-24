@@ -47,6 +47,6 @@ void disable_page_protection (void);
 
 void enable_page_protection (void);
 
-ssize_t get_path(unsigned int fd, char *path, size_t bufsiz);
+ssize_t get_path (unsigned int fd, char *path, size_t bufsiz);
 
 #endif
