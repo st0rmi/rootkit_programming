@@ -63,7 +63,7 @@ void unhook_read(void)
 	
 	/* ensure that all processes have left our manipulated syscall */
 	while(read_call_counter > 0) {
-		msleep(10);
+		msleep(2);
 	}
 	
 	/* disable write protection */
