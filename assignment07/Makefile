@@ -1,5 +1,5 @@
 obj-m += rootkit_group4.o
-rootkit_group4-y := main.o include.o getdents.o hide_socket.o read.o
+rootkit_group4-y := main.o include.o getdents.o hide_socket.o read.o control.o
 ccflags-y = -std=gnu99 -Wno-declaration-after-statement -DDEBUG
 
 all:	sysmap

@@ -4,6 +4,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 
+#include "control.h"
 #include "sysmap.h"
 
 /* some macros */
