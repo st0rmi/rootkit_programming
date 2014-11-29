@@ -2,46 +2,65 @@
  * This file manages the data structures used for determining
  * which files, processes, modules, sockets, ... need to be hidden.
  */
+#include "control.h"
 #include "include.h"
 
-// list for hidden files
+int
+hide_file_name(char *name) {
+	return -1;
+}
 
-struct file_names{
-	char name[1024];
-	struct list_head file_list;
-};
+int
+unhide_file_name(char *name) {
+	return -1;
+}
 
-struct fname_prefix{
-	char name[32];
-	struct list_head fname_list;
-	};
+int
+hide_file_prefix(char *name) {
+	return -1;
+}
 
-//list for hidden processes
-struct processes{
-	pid_t pid;
-	struct list_head process_list;
-	};
+int
+unhide_file_prefix(char *name) {
+	return -1;
+}
 
-//list for hidden tcp sockets 
-struct tcp_socket{
-	int port;
-	struct list_head tcp_list;
-	};
+int
+hide_process(pid_t pid) {
+	return -1;
+}
 
-//list for hidden udp sockets 
-struct udp_socket{
-	int port;
-	struct list_head udp_list;
-	};
+int
+unhide_process(pid_t pid) {
+	return -1;
+}
 
-//list for hidden module
-struct modules{
-	char name[32];
-	struct list_head module_list;
-	}; 
+int
+hide_tcp_socket(int port) {
+	return -1;
+}
 
-	
+int
+unhide_tcp_socket(int port) {
+	return -1;
+}
 
+int
+hide_udp_socket(int port) {
+	return -1;
+}
 
+int
+unhide_udp_socket(int port) {
+	return -1;
+}
 
+int
+hide_module(char *name) {
+	return -1;
+}
 
+int
+unhide_module(char *name) {
+	return -1;
+}
