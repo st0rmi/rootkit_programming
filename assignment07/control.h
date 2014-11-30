@@ -13,10 +13,10 @@ int
 is_path_hidden(char *name);
 
 int
-hide_file_name(char *name);
+hide_file_path(char *name);
 
 int
-unhide_file_name(char *name);
+unhide_file_path(char *name);
 
 int
 is_prefix_hidden(char *name);

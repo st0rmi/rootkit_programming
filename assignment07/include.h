@@ -69,6 +69,9 @@ struct proc_dir_entry {
  * Some helper functions
  */
 
+int
+convert_atoi(char *str);
+
 void
 disable_page_protection (void);
 

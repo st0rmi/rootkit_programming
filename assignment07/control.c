@@ -67,7 +67,7 @@ is_path_hidden(char *name)
 }
 
 int
-hide_file_name(char *name)
+hide_file_path(char *name)
 {
 	struct file_name *new;
 
@@ -92,7 +92,7 @@ hide_file_name(char *name)
 }
 
 int
-unhide_file_name(char *name)
+unhide_file_path(char *name)
 {
 	struct file_name *cur;
 	struct list_head *cursor, *next;

