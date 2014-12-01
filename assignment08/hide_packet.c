@@ -8,6 +8,8 @@
 
 
 /* Function to convert string to integer : Reuse appropriately */
+/* Use in4_pton for converting delete this whenever you get that working */
+
 int my_atoi(char *str)
 {
         int res = 0;

