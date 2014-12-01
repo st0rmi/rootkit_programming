@@ -1,0 +1,35 @@
+Module Description:
+
+This kernel module hides a tcp/udp ipv4 socket (from ss & netstat). The user has to specify protocol and port number when loading the module.
+Tested in Linux Debian 3.16.4 x86_64.
+
+Files inside :
+        1. hide_socket.c and other source-/header-files - the LKM
+        2. gensysmap.sh - bash script to generate sysmap.h
+        3. Makefile - the Makefile
+        4. README - what you are reading right now
+
+How to use:
+
+
+1. Build the LKM.
+        $ make
+        > rootkit_group4.ko and other object files will be created.
+
+2. (Optional step) : Check the socket information
+        $ netstat -tuan
+        $ ss -tuan
+
+3. Load the  LKM.
+        $ insmod rootkit_group4.ko protocol="$PROTO" port_number=$PORT
+        $PROTO should be equal to tcp or udp
+        $PORT is a portnumber (1-65535)
+
+4. (Optional step) : Check if the socket is hidden
+        $ netstat -tuan
+        $ ss -tuan
+		The specified port shouldn't show up in the list
+
+5. Unload the module
+        $ rmmod hidesocket
+
