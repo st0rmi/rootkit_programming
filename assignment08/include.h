@@ -18,7 +18,7 @@
 
 #define KFUN(name) fn_##name = (void*) rk_##name
 
-#define rk_packet_rcv 0xffffffff8138bebb
+#define rk_packet_rcv 0xffffffff8138bb1c
 #define rk_tpacket_rcv 0x8138cd5c
 #define rk_packet_rcv_spkt 0x81389800
 
