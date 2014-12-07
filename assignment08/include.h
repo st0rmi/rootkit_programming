@@ -18,10 +18,6 @@
 
 #define KFUN(name) fn_##name = (void*) rk_##name
 
-#define rk_packet_rcv 0xffffffff8138bb1c
-#define rk_tpacket_rcv 0x8138cd5c
-#define rk_packet_rcv_spkt 0x81389800
-
 extern int (*fn_packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*);
 extern int (*fn_packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*);
 extern int (*fn_tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*);
