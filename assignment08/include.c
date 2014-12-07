@@ -8,11 +8,6 @@
 
 #include "include.h"
 
-
-int (*fn_packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)      = (void*) sysmap_packet_rcv;
-int (*fn_packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void*) sysmap_packet_rcv_spkt;
-int (*fn_tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*)     = (void*) sysmap_tpacket_rcv;
-
 /*
  * Disable the writing protection for the whole processor.
  */

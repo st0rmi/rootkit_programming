@@ -3,9 +3,10 @@
 
 #include "include.h"
 
-//TODO : write fuctions for hooking packets (hooking packets?)
+void
+load_packet_hiding (char *);
 
-void hook_packets(char *);
-void unhook_packets(void);
+void
+unload_packet_hiding (void);
 
 #endif

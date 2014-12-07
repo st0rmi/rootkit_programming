@@ -5,10 +5,6 @@ ccflags-y = -DDEBUG
 
 all:	sysmap
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
-	@echo "*****************************"
-	@echo "To load the module use 'insmod rootkit_group4.ko ipv4=###.###.###.###'."
-	@echo "For more information please refer to the README file."
-	@echo "*****************************"
 
 sysmap:
 	./gensysmap.sh
