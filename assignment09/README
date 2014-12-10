@@ -1,0 +1,34 @@
+Module Description:
+
+This kernel module hides IPv4 packets from any process using libpcap to sniff packets (e.g. tcpdump). 
+The user has to specify the ipv4 address when loading the module.
+Tested in Linux Debian 3.16.4 x86_64.
+
+Files inside :
+        1. hide_packet.c and other source-/header-files - the LKM
+        2. gensysmap.sh - bash script to generate sysmap.h
+        3. Makefile - the Makefile
+        4. README - what you are reading right now
+
+How to use:
+
+
+1. Build the LKM.
+        $ make
+        > rootkit_group4.ko and other object files will be created.
+
+2. (Optional step) : Check for communication 
+        $ ping 8.8.8.8 (or any other ip, just adapt the other commands accordingly)
+        $ listen to 8.8.8.8 using tcpdump on another terminal(# tcpdump -n net 8.8.8.8)  
+	
+	You should see request/reply messages in tcpdump
+3. Load the  LKM.
+        $ insmod rootkit_group4.ko ipv4=###.###.###.###
+     	where ### is in the range of 0-255
+
+4. (Optional step) : tcpdump should stop receiving packets.
+		     You can try to unload/reload the module while still running tcpdump. It should start/stop receiving packets.
+
+5. Unload the module
+        $ rmmod rootkit_group4
+
