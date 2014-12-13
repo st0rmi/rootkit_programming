@@ -102,11 +102,11 @@ knocking_hook (const struct nf_hook_ops *ops,
 		 * craft an appropriate REJECT response
 		 */
 		if(ip_header->protocol == 6) {	/* tcp */
-			nf_send_reset(skb, ops->hooknum);
+			nf_send_reset(skb, ops->hooknum);	/* send TCP RST */
 		}
 		
 		if(ip_header->protocol == 17) {	/* udp */
-			// TODO: implement correct udp behavior
+			nf_send_unreach(skb, 3);	/* send icmp port unreachable */
 		}
 
 		/* we can now safely drop the packet */
