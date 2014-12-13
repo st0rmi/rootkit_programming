@@ -3,7 +3,7 @@
 
 #include "include.h"
 
-void
+int
 load_port_knocking (char *, unsigned int);
 
 void

