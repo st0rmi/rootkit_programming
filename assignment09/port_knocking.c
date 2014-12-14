@@ -66,7 +66,7 @@ is_port_blocked (struct sk_buff *skb) {
 
 	/* check tree for UDP */
 	if (protocol == PROTO_UDP
-		&&ip_header->protocol == 17) {
+		&& ip_header->protocol == 17) {
 
 		/* get the udp header */
 		udp_header = (struct udphdr *) skb_transport_header(skb);
@@ -165,7 +165,7 @@ load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
 
 	/* setup everything for the netfilter hook */
 	hook.hook = knocking_hook;		/* our function */
-	hook.hooknum = NF_INET_PRE_ROUTING;	/* grab everything that comes in */
+	hook.hooknum = NF_INET_LOCAL_IN;	/* grab everything that comes in */
 	hook.pf = PF_INET; 			/* we only care about ipv4 */
 	hook.priority = NF_IP_PRI_FIRST;	/* respect my prioritah */
 
