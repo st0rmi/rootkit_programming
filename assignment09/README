@@ -1,10 +1,10 @@
 Module Description:
 
-This kernel module impplements a rudimentary port knocking feature. 
+This kernel module implements a rudimentary port knocking feature. 
 It takes 3 arguments as inputs:
 	-> The local port of the service that we want to hide. (The service must be running)
 	-> The IP address from which connections are accepted. 
-	-> The protocol (TCP or UDP) 
+	-> The protocol (TCP or UDP). If no protocol is specified, the module defaults to using TCP. 
 
 Tested in Linux Debian 3.16.4 x86_64.
 
@@ -22,18 +22,17 @@ How to use:
         > rootkit_group4.ko and other object files will be created.
 
 2. (Optional step) : Check the running services
-	One way of doing is run nmap on perticular ip address (eg. nmap 127.0.0.1, default is tcp for udp pass -sU)
-	get the port number on that ip to hide.
+	One way of doing is running nmap on another machine and checking our IP. Use a TCP scan (e.g. -sS or -sF) to check for open TCP ports and -sU to check for open UDP ports. It might make sense to limit the checked ports to only the port which has port knocking enabled. The checked port should show up as open.
 
 3. Load the  LKM.
-        $ insmod rootkit_group4.ko ipv4=###.###.###.### port=<port_number> protocol=<tcp or udp>
-     	where ### is in the range of 0-255
+        $ insmod rootkit_group4.ko ipv4=###.###.###.### port=<port_number> protocol=<tcp|udp>
+     	where ### is in the range of 0-255. The Protocol option can be skipped for TCP use.
 	
 
 4. Verification: 
-	The hidden service should only run/showup for the specified ip address. 
-	nmap on the specified ip: The port/service should show up
-	nmap on any other ip: the service should be hidden
+	The hidden service should only be reachable for the specified ip address. 
+	nmap on the specified ip: The port should show up as open.
+	nmap on any other ip: The port should show up as closed.
 
 5. Unload the module
         $ rmmod rootkit_group4

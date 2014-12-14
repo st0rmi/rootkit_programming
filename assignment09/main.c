@@ -17,7 +17,7 @@ static char input_ip[16];
 module_param_string(ipv4, input_ip, 16, 0);
 static int port = -1;
 module_param(port, int, 0);
-static char protocol[4];
+static char protocol[4] = "tcp";
 module_param_string(protocol, protocol, 4, 0);
 
 /*
