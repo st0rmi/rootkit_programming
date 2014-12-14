@@ -1,11 +1,15 @@
 Module Description:
 
-This kernel module hides IPv4 packets from any process using libpcap to sniff packets (e.g. tcpdump). 
-The user has to specify the ipv4 address when loading the module.
+This kernel module impplements a rudimentary port knocking feature. 
+It takes 3 arguments as inputs:
+	-> The local port of the service that we want to hide. (The service must be running)
+	-> The IP address from which connections are accepted. 
+	-> The protocol (TCP or UDP) 
+
 Tested in Linux Debian 3.16.4 x86_64.
 
 Files inside :
-        1. hide_packet.c and other source-/header-files - the LKM
+        1. port_knocking.c and other source-/header-files - the LKM
         2. gensysmap.sh - bash script to generate sysmap.h
         3. Makefile - the Makefile
         4. README - what you are reading right now
@@ -17,17 +21,19 @@ How to use:
         $ make
         > rootkit_group4.ko and other object files will be created.
 
-2. (Optional step) : Check for communication 
-        $ ping 8.8.8.8 (or any other ip, just adapt the other commands accordingly)
-        $ listen to 8.8.8.8 using tcpdump on another terminal(# tcpdump -n net 8.8.8.8)  
-	
-	You should see request/reply messages in tcpdump
-3. Load the  LKM.
-        $ insmod rootkit_group4.ko ipv4=###.###.###.###
-     	where ### is in the range of 0-255
+2. (Optional step) : Check the running services
+	One way of doing is run nmap on perticular ip address (eg. nmap 127.0.0.1, default is tcp for udp pass -sU)
+	get the port number on that ip to hide.
 
-4. (Optional step) : tcpdump should stop receiving packets.
-		     You can try to unload/reload the module while still running tcpdump. It should start/stop receiving packets.
+3. Load the  LKM.
+        $ insmod rootkit_group4.ko ipv4=###.###.###.### port=<port_number> protocol=<tcp or udp>
+     	where ### is in the range of 0-255
+	
+
+4. Verification: 
+	The hidden service should only run/showup for the specified ip address. 
+	nmap on the specified ip: The port/service should show up
+	nmap on any other ip: the service should be hidden
 
 5. Unload the module
         $ rmmod rootkit_group4
