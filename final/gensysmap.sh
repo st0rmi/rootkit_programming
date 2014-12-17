@@ -5,10 +5,16 @@
 
 
 # check if a file by the name sysmap.h already exists and back it up if necessary
-[ -f ./sysmap.h ] && mv sysmap.h sysmap.h.old
+[ -f ./sysmap.h ] && rm -f sysmap.h
 
 # read the correct System.map file, filter out all the stuff we do not want and
 # format it in a way the preprocessor will understand by performing some regex magic
 cat /boot/System.map-`uname -r` | 
 	grep -P "\s+[RDT]+\s" |
-	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >>sysmap.h
+	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >> sysmap.h
+
+cat /boot/System.map-`uname -r` | 
+	grep -P "\s+[t]+\s" |
+	grep -Ev "\." |
+	grep -E "packet_rcv" |
+	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >> sysmap.h
