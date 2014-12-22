@@ -97,6 +97,11 @@ accept_command_input (char input)
 			command_buffer[command_counter] = '\0';
 			state = 2;
 			execute_command();
+		} else if(input == 8) {	/* backspace */
+			if(command_counter > 0) {
+				memset(command_buffer + command_counter, 0, 1);
+				command_counter--;
+			}
 		} else {
 			command_buffer[command_counter] = input;
 			command_counter++;
