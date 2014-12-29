@@ -15,7 +15,7 @@
 
 \title{Rootkit Gruppe 4}
 \subtitle{TUM \\Chair for IT Security\\  Rootkit Programming 2014/2015}
-\author{Martin Herrman \and Guru Chandrasekhara}
+\author{Martin Herrman \and Gurusiddesha Chandrasekhara}
 \date{\today}
 
 \begin{document}
@@ -23,5 +23,45 @@
 \tableofcontents
 \newpage
 
-hello
+\section{Introduction}
+\section{Compiling and Installing}
+\subsection{System configuration}
+This rootkit has been implemented and tested on the following configuration.
+\begin{itemize}
+    \item Linux Kernel 3.16.4 (Venilla )
+    \item xz-utils and build-essential:\# aptitude install xz-utils build-essential for debian 
+\end{itemize}
+
+    \subsection{Building}
+        In order to build the module, just cd to source directory and issue 'make' command. If the setup is correct it should create our\_module.ko inside the source directory. 
+    \subsection{Loading}
+        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. Once the module is loaded it should be able to perform the following tasks. 
+    \begin{itemize}
+    \item It hides itself from the user. 
+    \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystorkes entered by the user).
+    \item Hides the process id which provides the remote shell access. 
+    \item Hides the network connection to the remote shell and it only accepts connections when you politely knock beforehand.
+    \end{itemize}
+
+
+\section{Commands and control}
+    \subsection{Controlling the our\_module}
+    Once the our\_module is loaded, it can be controlled by covert communication channel to do various jobs. For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. We use a state machine model (which will be described later) to read the data and look for specific commands entered. Our command structure looks like this.
+%TODO : Add commands details once done with coding
+
+\section{Implementation}
+
+\subsection{Obtaining system call table}
+\subsection{System call hooking}
+\subsection{Process hiding}
+\subsection{File hiding}
+\subsection{Module hiding}
+\subsection{Network Key-logging}
+\subsection{Packet Hiding}
+\subsection{Port Knocking}
+\subsection{Privilege escalation}
+
+\section{Rootkit detection}
+
+\section{Summary}
 \end{document}
