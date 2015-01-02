@@ -32,11 +32,15 @@ This rootkit has been implemented and tested on the following configuration.
     \item xz-utils and build-essential:\# aptitude install xz-utils build-essential for debian 
 \end{itemize}
 
-    \subsection{Building}
-        In order to build the module, just cd to source directory and issue 'make' command. If the setup is correct it should create our\_module.ko inside the source directory. 
-    \subsection{Loading}
-        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. Once the module is loaded it should be able to perform the following tasks. 
-    \begin{itemize}
+\subsection{Building}
+        In order to build the module, just cd to source directory and issue 'make' command. 
+	If the setup is correct it should create our\_module.ko inside the source directory. 
+
+\subsection{Loading}
+        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. 
+	Once the module is loaded it should be able to perform the following tasks. 
+    
+\begin{itemize}
     \item It hides itself from the user. 
     \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystorkes entered by the user).
     \item Hides the process id which provides the remote shell access. 
@@ -46,16 +50,59 @@ This rootkit has been implemented and tested on the following configuration.
 
 \section{Commands and control}
     \subsection{Controlling the our\_module}
-    Once the our\_module is loaded, it can be controlled by covert communication channel to do various jobs. For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. We use a state machine model (which will be described later) to read the data and look for specific commands entered. Our command structure looks like this.
+    Once our\_module is loaded, it can be controlled by covert communication channel to do various jobs. 
+For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
+We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
+Our command structure looks like this.
 %TODO : Add commands details once done with coding
 
 \section{Implementation}
 
 \subsection{Obtaining system call table}
+
 \subsection{System call hooking}
+
 \subsection{Process hiding}
+The task was to hide process ids, which user enters when inserting the module. 
+To check the processes, we can do \texttt{ls} on \texttt{/proc} directory. 
+\texttt{ps} also does an \texttt{ls} on \texttt{/proc} folder.   
+\texttt{strace} on ls gave us that, it calls getndents and reads each linux\_dirent structures. 
+d\_reclen is the length is the length of each structure. 
+
+
+int getdents(unsigned int fd, struct linux\_dirent *dirp,
+                    unsigned int count);
+
+
+So to do this we hook \texttt{getdents} system call. 
+We first compare if \texttt{fd} matches \texttt{/proc} folder. 
+If it matches, then iterate over each entry in the directory.
+dirp->d\_name is the name of each entry inside the folder. 
+So we first need to convert this char entry to integer and compare with the pid which we want to hide.
+If it matches, then we delete the entry. 
+
 \subsection{File hiding}
-\subsection{Module hiding}
+The task was to hide any file names starting with rootkit\_ and to hide any open file descriptors, starting with that name.
+we hook \texttt{getdents} function as we did it for process hiding. 
+We simply call original getdents function and iterate over linux\_dirent structures.
+we search for d\_name matching to a prefix, \texttt{rootkit\_} or \texttt{.rootkit\_}. 
+If we find the match, we just {\em delete} it by moving the pointer using \texttt{memmove}.
+
+%TODO: @mher:Could you please add details for hiding symlinks 
+
+\subsection{Code hiding}
+We can get the information on loaded modules using \texttt{lsmod}
+(which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
+
+\texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
+where each list of type \texttt{struct module}. 
+To hide it from lsmod we just need to delete the perticular entry from the list of modules. This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, \texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, it will not show up anymore when using \texttt{lsmod}. 
+
+\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was tricky part. Just deleting from the list of modules, 
+will not stop showing it up from \texttt{/sys/modules}. 
+
+TODO: gmc: add details about removing kernfs\_node. 
+
 \subsection{Network Key-logging}
 \subsection{Packet Hiding}
 \subsection{Port Knocking}
