@@ -1,0 +1,278 @@
+\documentclass[10pt, letterpaper]{scrartcl}
+\usepackage [english]{babel}
+\usepackage{enumitem}
+\usepackage{geometry}
+\usepackage{color}
+\usepackage{tikz}
+\usepackage{listings}
+\usetikzlibrary{snakes}
+\usetikzlibrary{patterns}
+\usepackage[loose]{subfigure}
+\usepackage[pdfborder={0 0 0}]{hyperref}
+
+
+\geometry{margin=2.5cm}
+
+\title{Rootkit Gruppe 4}
+\subtitle{TUM \\Chair for IT Security\\  Rootkit Programming 2014/2015}
+\author{Martin Herrman \and Gurusiddesha Chandrasekhara}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+\section{Compiling and Installing}
+\subsection{System configuration}
+This rootkit has been implemented and tested on the following configuration.
+\begin{itemize}
+    \item Linux Kernel 3.16.4 (Venilla )
+    \item xz-utils and build-essential:\# aptitude install xz-utils build-essential for debian 
+\end{itemize}
+
+\subsection{Building}
+        In order to build the module, just cd to source directory and issue 'make' command. 
+	If the setup is correct it should create our\_module.ko inside the source directory. 
+
+\subsection{Loading}
+        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. 
+	Once the module is loaded it should be able to perform the following tasks. 
+    
+\begin{itemize}
+    \item It hides itself from the user. 
+    \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystorkes entered by the user).
+    \item Hides the process id which provides the remote shell access. 
+    \item Hides the network connection to the remote shell and it only accepts connections when you politely knock beforehand.
+    \end{itemize}
+
+
+\section{Commands and control}
+    \subsection{Controlling our\_module}
+    Once our\_module is loaded, it can be controlled by covert communication channel to do various jobs. 
+For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
+We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
+Our command structure looks like this.
+%TODO : Add commands details once done with coding
+
+\section{Implementation}
+
+\subsection{Obtaining address of kernel symbols}
+The kernel symbols are important in writing various modules. Many of the kernel symbols are not easily available through libraries 
+and many of them are not exported in recent kernel versions (for eg. \texttt{sys\_call\_table}).
+The \texttt{System.map.<kernel version>} file under \texttt{/boot} directory stores the address of the kernel symbols and is of the form, 
+\begin{verbatim}
+address type symbol_name
+\end{verbatim}
+
+We wrote a simple bash script to take these symbols and define them in a \texttt{sysmap.h} file. 
+Each line the file looks like, 
+
+\begin{verbatim}
+#define sysmap_symbol_name address
+\end{verbatim}
+
+When we require a perticular kernel symbol, we can just type cast the corresponding symbol and use it. 
+
+\texttt{System call table}: The system call table lists the system calls available in that specific Linux kernel version. 
+It could also be thought of as an API for the interface between user space and kernel space. 
+In order to manipulate the system calls(which we explain in upcoming sections), our first job was to access the system call table.
+We can access the sytem call table from the \texttt{sysmap.h} file like this,
+
+\begin{verbatim}
+void **sys_call_table = (void *) sysmap_sys_call_table;
+\end{verbatim}
+
+\subsection{System call hooking}
+System call hooking is a well known method in writing root-kits. 
+We know that all system call addresses are in \texttt{sys\_call\_table} and they will be executed according to requirement.
+The fundamental idea is that, we change system call table address to our custom function, 
+while store pointer to the original function. This way whenever the function is called, 
+it will first land in our {\em manipulated} function. 
+We can play with the arguments and modify(or keep original) them according to the need and call the original function with the manipulated(or original) set of arguments. 
+
+\texttt{Disabling and enabling write protection}: 
+We cannot just modify the system call table since it is write protected. 
+For this, we found a mechanism to disable the write protection for the whole processor, 
+using assembly code and enable it back after modification.
+
+\begin{verbatim}
+static void disable_page_protection(void) {
+
+    unsigned long value;
+    asm volatile("mov %%cr0,%0" : "=r" (value));
+    if (value & 0x00010000) {
+            value &= ~0x00010000;
+            asm volatile("mov %0,%%cr0": : "r" (value));
+    }
+}
+
+static void enable_page_protection(void) {
+
+    unsigned long value;
+    asm volatile("mov %%cr0,%0" : "=r" (value));
+    if (!(value & 0x00010000)) {
+            value |= 0x00010000;
+            asm volatile("mov %0,%%cr0": : "r" (value));
+    }
+}
+\end{verbatim}
+
+As you can notice in the code, \texttt{cr0} is a control register, 
+The 16th bit controls page protection enforcement: 
+toggling this bit turns of the write protection for the complete processor.
+We can do this in kernel space, because the code is executed at privilege level (ring) 0. 
+
+\subsection{Process hiding}
+The task was to hide process ids, which user enters when inserting the module. 
+To check the processes, we can do \texttt{ls} on \texttt{/proc} directory. 
+\texttt{ps} also does an \texttt{ls} on \texttt{/proc} folder.   
+\texttt{strace} on \texttt{ls} gave us that, it calls getndents and reads each linux\_dirent structures. 
+\texttt{d\_reclen} is the length of each structure. 
+
+\begin{verbatim}
+int getdents(unsigned int fd, struct linux\_dirent *dirp,
+                    unsigned int count);
+\end{verbatim}
+
+
+So to do this we hook \texttt{getdents} system call. 
+We first compare if \texttt{fd} matches \texttt{/proc} folder. 
+If it matches, then iterate over each entry in the directory.
+dirp->d\_name is the name of each entry inside the folder. 
+So we first need to convert this char entry to integer and compare with the pid which we want to hide.
+If it matches, then we delete the entry. 
+
+\subsection{File hiding}
+The task was to hide any file names starting with rootkit\_ and to hide any open file descriptors, 
+starting with that name. we hook \texttt{getdents} function as we did it for process hiding. 
+We simply call original getdents function and iterate over linux\_dirent structures.
+we search for d\_name matching to a prefix, \texttt{rootkit\_} or \texttt{.rootkit\_}. 
+If we find the match, we just {\em delete} it by moving the pointer using \texttt{memmove}.
+
+%TODO: @mher:Could you please add details for hiding symlinks 
+
+\subsection{Code hiding}
+We can get the information on loaded modules using \texttt{lsmod}
+(which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
+
+\texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
+where each list of type \texttt{struct module}. 
+To hide it from lsmod we just need to delete the perticular entry from the list of modules. 
+This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, 
+\texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, 
+it will not show up anymore when using \texttt{lsmod}. 
+
+\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was tricky part. 
+Just deleting from the list of modules, 
+will not stop showing it up from \texttt{/sys/modules}. 
+
+TODO: gmc: add details about removing kernfs\_node. 
+
+\subsection{Network key-logging}
+We had the local key-logging already enabled in our root-kit by hooking \texttt{read} system call. 
+We just had to send this keys to \texttt{syslog-ng} server, using syslog protocol. 
+These packets can be sent using \texttt{UDP} packets using \texttt{netpoll} kernel API. 
+The \texttt{netpoll.h} provides the mechanism for sending UDP packets to a remote host. 
+Only one constraint in netpoll is that, the destination port has to be a ethernet port. 
+
+Todo this job, we need to first initialize the netpoll structure with IP address, port number etc. 
+before using it to send the keys. 
+The \texttt{netpoll} structure looks like this, 
+
+\begin{verbatim}
+  struct netpoll {
+          struct net_device *dev;
+          char dev_name[IFNAMSIZ]; // device name has to be ethernet
+          const char *name; 
+  
+          union inet_addr local_ip, remote_ip;	// Ip addresses in network byte order
+          bool ipv6; 
+          u16 local_port, remote_port; // some unused local port(eg. 6666) and 
+				      //remote_port = 514 (for syslog-ng server)
+          u8 remote_mac[ETH_ALEN]; // set to 0xff
+  
+          struct work_struct cleanup_work;
+  };
+\end{verbatim}
+
+Once the structre is initialized, we call,
+\begin{verbatim}
+int netpoll_setup(struct netpoll *);
+\end{verbatim} 
+
+This function sets up everything needed for sending the keys. Now we need take the input keys, 
+add the pid information of the terminal and send the keys using \texttt{netpoll\_send\_UDP} which looks like,
+
+\begin{verbatim}
+netpoll_send_UDP(np, sned_buf, send_len); 
+\end{verbatim}
+
+\texttt{Getting the PID information}: This was quite simple, as the \texttt{current} macro was quite handy in this situation.
+\texttt{current} macro points to the \texttt{task\_struct} of the currently executing process. 
+\texttt{task\_struct} has the \texttt{pid} member
+. 
+
+\texttt{Setting up syslog-ng server}: TODO: gmc 
+
+\subsection{Privilege escalation}
+To give the root privilages to any shell, we have to hack the credentials of the perticular shell and 
+manipulate them. There is a structure called \texttt{cred}: 
+It holds the credentials of the respective process. These credentials are uids and gids. 
+There are functions available from Linux kernel, to get these credentials and change them. 
+
+\begin{verbatim}
+struct cred * prepare_creds();
+commit_creds(struct cred *);
+\end{verbatim}
+
+Once we get the credentials, we can assign all the ids to 0, and we will have root access from that shell. 
+Sicne we have hooked read system call, 
+we can type \texttt{escalate} from any terminal and it gets the root access. 
+
+\subsection{Socket hiding}
+The task was to hide any existing TCP/UDP sockets from the user. 
+User can determine the socket details using \texttt{ss} and \texttt{netstat} commands.
+The idea was to determine how netstat and ss works, 
+then manipulate their behavior in such a way that they don't show the sockets whih we want to hide. 
+With a little bit of research(\texttt{strace} on netstat), 
+we found that netstat just prints out the contents of \texttt{/proc/tcp} and \texttt{/proc/udp}.
+
+Our initial assumption of just manipulating these files was not so straight forward. 
+Since, these files are \texttt{sequence files}: 
+These files sequentially fills up on request by corresponding \texttt{sequence functions}. 
+We had to get access to these sequence functions, \texttt{tcp\_seq\_show} and \texttt{udp\_seq\_show}. 
+From the \texttt{proc\_dir\_entry} \texttt{init\_net.proc\_net->subdir}, 
+we can search for the directory names \texttt{tcp} and \texttt{udp}. \
+Once we get the match we store the pointer of original function, and replace by our hooked function. 
+
+To filter out the sockets by port number we need to access port number inside our hooked function. 
+\texttt{inet\_sock} struct has the port number. 
+In our hooked function, we have void pointer which is of type \texttt{struct sock}. 
+We can get the \texttt{inet\_sock} stucture from \texttt{sock} using \texttt{inet\_sk} function. 
+If we find the port of our interest, we just \texttt{return 0;} so that this line doesn't show up in the 
+sequence file, otherwise it behaves as original show function. 
+
+\texttt{Hiding TCP sockets from ss}: By manipulating sequence functions we took care of \texttt{netstat} 
+command and UDP packets from \texttt{ss} command. But still TCP sockets shows up through the \texttt{ss} command.
+To read from the sockets, \texttt{ss} uses \texttt{recvmsg} system call. 
+If we hook the \texttt{recvmsg} system call and intercept the data, we will be able to hide TCP sockets from ss. 
+For this reason we hooked \texttt{recvmsg} system call, 
+since hooking system calls is one of the easiest ways to alter the data.
+We obtain the \texttt{nlmsghdr} from the hooked call and we get the length of the original call.
+Until we find our port number, we search for it in the next messages in multipart message. 
+Once we find the port number that we want to hide, 
+we copy the remaining entries and decrease the length of the original function and call it.
+
+
+\subsection{Packet hiding}
+
+
+\subsection{Port knocking}
+
+
+\section{Rootkit detection}
+
+\section{Summary}
+\end{document}
