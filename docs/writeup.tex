@@ -5,6 +5,9 @@
 \usepackage{color}
 \usepackage{tikz}
 \usepackage{listings}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{multirow}
 \usetikzlibrary{snakes}
 \usetikzlibrary{patterns}
 \usepackage[loose]{subfigure}
@@ -55,6 +58,52 @@ For this, we hook the read system call and intercept data from stdin and take ac
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
 Our command structure looks like this.
 %TODO : Add commands details once done with coding
+Each command starts with a prefix(For detecting purpose), \texttt{f7R\_} and ends with ;. 
+After the prefix one can enter the actual command. The format of the command looks like,
+\\~
+\texttt{f7R\_command\textvisiblespace parameter;}
+
+After you enter the command \texttt{enter} is not necessary, you can press \texttt{Ctrl + C} to avoid bash error. 
+Our module will execute as soon as the suffix(;) is entered, provided the command exists. 
+The table %ADD table refrence
+gives the available commands and their use. 
+
+\begin{tabular}{ |l|l| }
+\hline
+\multicolumn{2}{ |c| }{File hiding} \\
+\hline
+ \texttt{f7R\_hide\_file\textvisiblespace<path>;} & \texttt{<path>} is the absolute path of the file to hide \\
+ \texttt{f7R\_unhide\_file\textvisiblespace<path>;} & To unhide the previously hidden file \\ \hline
+
+\multicolumn{2}{ |c| }{Process hiding} \\
+\hline
+\texttt{f7R\_hide\_process\textvisiblespace<pid>;} & \texttt{<pid>} is the id of the process to be hidden\\
+\texttt{f7R\_unhide\_process\textvisiblespace<pid>;} & To unhide the process by it's pid\\ \hline
+
+
+\multicolumn{2}{ |c| }{Hiding sockets} \\
+\hline
+\texttt{f7R\_hide\_tcp\textvisiblespace<port>;} & \texttt{<port>} is the port number of tcp socket to be hidden\\
+\texttt{f7R\_unhide\_tcp\textvisiblespace<port>;} & To unhide the tcp socket\\
+\texttt{f7R\_hide\_udp\textvisiblespace<port>;} & \texttt{<port>} is the port number of udp socket to be hidden\\
+\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unhide the udp socket\\ \hline
+
+\multicolumn{2}{ |c| }{Module hiding} \\
+\hline
+\texttt{f7R\_hide\_module\textvisiblespace<name>;} & \texttt{<name>} is the name of the module to be hidden\\
+\texttt{f7R\_unhide\_module\textvisiblespace<name>;} & to unhide the hidden module\\ \hline
+
+
+\multicolumn{2}{ |c|}{Network key logging} \\
+\hline
+\texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & To enable network keylogging, ip of the destination must be given\\
+\texttt{f7R\_disable\_net\_keylog;} & To disable network keylogging, no parameter required.\\ \hline
+
+\multicolumn{2}{ |c| }{Previlage escalation} \\
+\hline
+\texttt{f7R\_escalate;} & type this from any terminal, that will get root previlages.\\ \hline
+
+\end{tabular}
 
 \section{Implementation}
 
