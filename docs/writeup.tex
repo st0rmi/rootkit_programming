@@ -17,7 +17,7 @@
 \geometry{margin=2.5cm}
 
 \title{Rootkit Gruppe 4}
-\subtitle{TUM \\Chair for IT Security\\  Rootkit Programming 2014/2015}
+\subtitle{TUM \\Chair of IT Security\\  Rootkit Programming 2014/2015}
 \author{Martin Herrman \and Gurusiddesha Chandrasekhara}
 \date{\today}
 
@@ -27,6 +27,14 @@
 \newpage
 
 \section{Introduction}
+This root-kit has been implemented as part of the "Root-kit programming" lab course. 
+It is a single Linux Kernel Module(LKM) and can be inserted into the Linux kernel 3.16 or later versions. 
+It explains how to acheive many root-kit functionalities just by manipulation of kernel data structures and hooking few system calls. 
+Controlled correctly, it does so much work such as hiding files, hiding processes, hiding sockets, keylogging, 
+sending key strokes to remote machine, hiding network packets, previlage escalation.   
+
+Compilation, installation and controlling is explained in the coming sections.
+
 \section{Compiling and Installing}
 \subsection{System configuration}
 This rootkit has been implemented and tested on the following configuration.
@@ -37,11 +45,11 @@ This rootkit has been implemented and tested on the following configuration.
 
 \subsection{Building}
         In order to build the module, just cd to source directory and issue 'make' command. 
-	If the setup is correct it should create our\_module.ko inside the source directory. 
+	If the setup is correct, it should create our\_module.ko inside the source directory. 
 
 \subsection{Loading}
         Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. 
-	Once the module is loaded it should be able to perform the following tasks. 
+	Once the module is loaded, it does the following tasks. 
     
 \begin{itemize}
     \item It hides itself from the user. 
@@ -56,18 +64,20 @@ This rootkit has been implemented and tested on the following configuration.
     Once our\_module is loaded, it can be controlled by covert communication channel to do various jobs. 
 For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
-Our command structure looks like this.
+
 %TODO : Add commands details once done with coding
 Each command starts with a prefix(For detecting purpose), \texttt{f7R\_} and ends with ;. 
 After the prefix one can enter the actual command. The format of the command looks like,
 \\~
 \texttt{f7R\_command\textvisiblespace parameter;}
 
-After you enter the command \texttt{enter} is not necessary, you can press \texttt{Ctrl + C} to avoid bash error. 
+After you typed the command, pressing \texttt{return} or \texttt{enter} is not necessary, you can press \texttt{Ctrl + C} to avoid bash error. 
 Our module will execute as soon as the suffix(;) is entered, provided the command exists. 
 The table %ADD table refrence
 gives the available commands and their use. 
 
+\begin{table}
+%\centering
 \begin{tabular}{ |l|l| }
 \hline
 \multicolumn{2}{ |c| }{File hiding} \\
@@ -104,6 +114,9 @@ gives the available commands and their use.
 \texttt{f7R\_escalate;} & type this from any terminal, that will get root previlages.\\ \hline
 
 \end{tabular}
+\caption{Commands to control the rootkit}
+\label{tab:commands}
+\end{table}
 
 \section{Implementation}
 
@@ -116,7 +129,7 @@ address type symbol_name
 \end{verbatim}
 
 We wrote a simple bash script to take these symbols and define them in a \texttt{sysmap.h} file. 
-Each line the file looks like, 
+Each line of the file looks like, 
 
 \begin{verbatim}
 #define sysmap_symbol_name address
@@ -143,8 +156,9 @@ We can play with the arguments and modify(or keep original) them according to th
 
 \texttt{Disabling and enabling write protection}: 
 We cannot just modify the system call table since it is write protected. 
-For this, we found a mechanism to disable the write protection for the whole processor, 
-using assembly code and enable it back after modification.
+So we have to disable the write protection before modification.
+For this, we found a mechanism to disable the write protection for the whole processor.
+By using assembly code we modify \texttt{cr0} register value.
 
 \begin{verbatim}
 static void disable_page_protection(void) {
@@ -276,7 +290,7 @@ struct cred * prepare_creds();
 commit_creds(struct cred *);
 \end{verbatim}
 
-Once we get the credentials, we can assign all the ids to 0, and we will have root access from that shell. 
+Once we get the credentials, we can assign all the ids to 0, and we will give the root access to the shell. 
 Sicne we have hooked read system call, 
 we can type \texttt{escalate} from any terminal and it gets the root access. 
 
@@ -310,13 +324,14 @@ If we hook the \texttt{recvmsg} system call and intercept the data, we will be a
 For this reason we hooked \texttt{recvmsg} system call, 
 since hooking system calls is one of the easiest ways to alter the data.
 We obtain the \texttt{nlmsghdr} from the hooked call and we get the length of the original call.
-Until we find our port number, we search for it in the next messages in multipart message. 
+Until we find our port number, we search for port number in the next messages in multipart message. 
 Once we find the port number that we want to hide, 
 we copy the remaining entries and decrease the length of the original function and call it.
 
 
 \subsection{Packet hiding}
-
+Our goal was to hide any network packets from any process which uses libcap to  sniff packets.
+At first we wanted to understand how libcap tools work to sniff packets. 
 
 \subsection{Port knocking}
 
