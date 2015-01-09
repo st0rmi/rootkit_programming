@@ -114,6 +114,7 @@ accept_command_input (char input)
 			state = 2;
 			execute_command();
 		} else if(input == 8) {	/* backspace */
+			ROOTKIT_DEBUG("Backspace detected.\n");
 			if(command_counter > 0) {
 				memset(command_buffer + command_counter, 0, 1);
 				command_counter--;

