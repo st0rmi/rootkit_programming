@@ -425,7 +425,7 @@ is_port_filtered(int port, int protocol, int ipaddr)
 		cur = list_entry(cursor, struct port_knocking, list);
 		/* if port and protocol match (but not ipaddr), filter it */
 		if(cur->port == port
-			&& cur->protocol == protocol)
+			&& cur->protocol == protocol
 			&& cur->ipaddr != ipaddr) {
 			return 1;
 		}

