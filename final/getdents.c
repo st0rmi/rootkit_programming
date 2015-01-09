@@ -89,7 +89,7 @@ check_hide_fprefix(char *path)
 		d_name = get_next_level(path);
 		
 		if(d_name == NULL) {
-			return 0;
+			break;
 		}
 
 		// TODO: implement dynamic prefixes
@@ -102,6 +102,8 @@ check_hide_fprefix(char *path)
 			return 1;
 		}
 	} while (d_name != NULL);
+	
+	return 0;
 }
 
 /* 
@@ -164,7 +166,7 @@ check_hide_symlink(char *path)
 
 		/* needed because the other functions apparently can't handle it */		
 		if(lpath_len < 0) {
-			return 0;
+			break;
 		}
 		
 		/* check if the current link is pointing to a hidden path */
@@ -182,6 +184,8 @@ check_hide_symlink(char *path)
 		strncpy(curpath, lpath, 1024);
 
 	} while (lpath_len > 0);
+	
+	return 0;
 }
 
 /*
