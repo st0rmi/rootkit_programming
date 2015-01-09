@@ -21,8 +21,10 @@
 int init_module (void)
 {
 	int ret;
-	
+
+	ROOTKIT_DEBUG("****************************************\n");	
 	ROOTKIT_DEBUG("Beginning rootkit loading procedure...\n");
+	ROOTKIT_DEBUG("****************************************\n");	
 
 	// TODO: change all these functions from void to int to relay success/failure
 	// TODO: remove as many parameters from the load functions as possible
@@ -41,7 +43,9 @@ int init_module (void)
 		return ret;
 	}
 
+	ROOTKIT_DEBUG("****************************************\n");	
 	ROOTKIT_DEBUG("Loading was successful!\n");
+	ROOTKIT_DEBUG("****************************************\n");	
 	return 0;
 }
 
@@ -52,7 +56,9 @@ int init_module (void)
  */
 void cleanup_module (void)
 {
+	ROOTKIT_DEBUG("****************************************\n");	
 	ROOTKIT_DEBUG("Beginning rootkit unloading procedure...\n");
+	ROOTKIT_DEBUG("****************************************\n");	
 
 	// TODO: adapt all unload functions to only do something if they are loaded
 	
@@ -66,5 +72,7 @@ void cleanup_module (void)
 	cleanup_control();
 	
 	/* Finally, log the unloading */
+	ROOTKIT_DEBUG("****************************************\n");	
 	ROOTKIT_DEBUG("Unloading was successful. Bye!\n");
+	ROOTKIT_DEBUG("****************************************\n");	
 }
