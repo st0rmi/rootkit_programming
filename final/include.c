@@ -8,8 +8,6 @@
 
 #include "include.h"
 
-
-
 /*
  * Get PID from the name.
  */
