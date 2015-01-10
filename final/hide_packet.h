@@ -3,7 +3,7 @@
 
 #include "include.h"
 
-void
+int
 load_packet_hiding (char *);
 
 void
