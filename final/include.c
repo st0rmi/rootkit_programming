@@ -71,9 +71,9 @@ get_path(unsigned int fd, char *path, size_t bufsiz)
 	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
 
 	/* ensure that the memory is actually allocated */
-	if(buf == NULL) {
-		return -ENOMEM;
-	}
+	//if(buf == NULL) {
+	//	return -ENOMEM;
+	//}
 	
 	current_files = current->files;
 	files_table = files_fdtable(current_files);
