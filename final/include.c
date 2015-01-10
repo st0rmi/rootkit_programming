@@ -9,7 +9,7 @@
 #include "include.h"
 
 /*
- * Get PID from the name.
+ * Converts a string PID to an int.
  */
 int
 convert_atoi(char *str)
@@ -57,7 +57,9 @@ enable_page_protection (void)
     	}
 }
 
-/* Gets the absolute path to a file identified by fd */
+/*
+ * Gets the absolute path to a file identified by fd.
+ */
 ssize_t
 get_path(unsigned int fd, char *path, size_t bufsiz)
 {
@@ -68,6 +70,11 @@ get_path(unsigned int fd, char *path, size_t bufsiz)
 	char *cwd;
 	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
 
+	/* ensure that the memory is actually allocated */
+	if(buf == NULL) {
+		return -ENOMEM;
+	}
+	
 	current_files = current->files;
 	files_table = files_fdtable(current_files);
 	
