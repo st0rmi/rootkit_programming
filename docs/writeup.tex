@@ -39,8 +39,7 @@ Compilation, installation and controlling is explained in the coming sections.
 \subsection{System configuration}
 This rootkit has been implemented and tested on the following configuration.
 \begin{itemize}
-    \item Linux Kernel 3.16.4 (Venilla )
-    \item xz-utils and build-essential:\# aptitude install xz-utils build-essential for debian 
+    \item Linux Kernel 3.16.4 (Vanilla kernel) 
 \end{itemize}
 
 \subsection{Building}
@@ -65,7 +64,7 @@ This rootkit has been implemented and tested on the following configuration.
 For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
 
-%TODO : Add commands details once done with coding
+%TODO : Add command details once done with coding
 Each command starts with a prefix(For detecting purpose), \texttt{f7R\_} and ends with ;. 
 After the prefix one can enter the actual command. The format of the command looks like,
 \\~
@@ -96,7 +95,7 @@ gives the available commands and their use.
 \texttt{f7R\_hide\_tcp\textvisiblespace<port>;} & \texttt{<port>} is the port number of tcp socket to be hidden\\
 \texttt{f7R\_unhide\_tcp\textvisiblespace<port>;} & To unhide the tcp socket\\
 \texttt{f7R\_hide\_udp\textvisiblespace<port>;} & \texttt{<port>} is the port number of udp socket to be hidden\\
-\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unhide the udp socket\\ \hline
+\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unishie the udp socket\\ \hline
 
 \multicolumn{2}{ |c| }{Module hiding} \\
 \hline
@@ -214,24 +213,35 @@ We simply call original getdents function and iterate over linux\_dirent structu
 we search for d\_name matching to a prefix, \texttt{rootkit\_} or \texttt{.rootkit\_}. 
 If we find the match, we just {\em delete} it by moving the pointer using \texttt{memmove}.
 
-%TODO: @mher:Could you please add details for hiding symlinks 
+@mher:Could you please add details for hiding symlinks 
 
 \subsection{Code hiding}
 We can get the information on loaded modules using \texttt{lsmod}
 (which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
 
 \texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
-where each list of type \texttt{struct module}. 
+where each list of type \texttt{struct module}. \texttt{THIS\_MODULE} macro which points to the current module. 
 To hide it from lsmod we just need to delete the perticular entry from the list of modules. 
 This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, 
 \texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, 
 it will not show up anymore when using \texttt{lsmod}. 
 
-\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was tricky part. 
-Just deleting from the list of modules, 
-will not stop showing it up from \texttt{/sys/modules}. 
+\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was a tricky part. 
+Just deleting from the list of modules, will not stop showing it up from \texttt{/sys/modules}.
+This we can do by two different methods. By hacking the \texttt{filldir} function or by deleting it from the 
+kernel file system. If we do this by using first method our\_module will be easily detectable. 
+% add how: One can count the number of modules from 
+So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
+If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
+In recent version of kernel these kernel objects are implemented as red-black trees. 
+There are functions defined in \texttt{rbtree.h} to perform this operation. 
 
-TODO: gmc: add details about removing kernfs\_node. 
+\begin{verbatim}
+rb_erase(&kn->rb, &kn->parent->dir.children);
+RB_CLEAR_NODE(&kn->rb);
+\end{verbatim}
+
+%TODO: gmc: add details about removing kernfs\_node. 
 
 \subsection{Network key-logging}
 We had the local key-logging already enabled in our root-kit by hooking \texttt{read} system call. 
@@ -336,7 +346,7 @@ At first we wanted to understand how libcap tools work to sniff packets.
 \subsection{Port knocking}
 
 
-\section{Rootkit detection}
+\section{vulnerabilities}
 
-\section{Summary}
+\section{Final words}
 \end{document}
