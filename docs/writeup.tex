@@ -110,7 +110,8 @@ gives the available commands and their use.
 
 \multicolumn{2}{ |c| }{Previlage escalation} \\
 \hline
-\texttt{f7R\_escalate;} & type this from any terminal, that will get root previlages.\\ \hline
+\texttt{f7R\_escalate;} & Type this from any terminal, that will get root previleges.\\ 
+\texttt{f7R\_deescalate;} & Revokes the root previleges of a shell.\\ \hline
 
 \end{tabular}
 \caption{Commands to control the rootkit}
@@ -118,6 +119,36 @@ gives the available commands and their use.
 \end{table}
 
 \section{Implementation}
+This section explains how our\_module is designed and how do we achieve specific functionality. 
+
+\subsection{High-level design}
+our\_module is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
+This gives us a lot of flexibility to add or remove any feature.
+
+\texttt{main.c} combines every functionality and that's where we have \texttt{init\_module} and \texttt{cleanup\_module}.
+The following table describes the functionality of each file.
+
+
+
+\begin{tabular}{l*{6}r}
+File name             & Functionality \\
+\hline
+gensysmap.sh & Bach script to generate sysmap.h file\\
+control.\{c,h\} & Manages the data structures for diffrent hiding methods\\
+include.\{c,h\} & contains many different helper functions   \\
+covert\_communication.\{c,h\} & All functionality needed for the covert communication channel \\
+getdents.\{c,h\} & contains everything needed for the manipulated getdents syscall\\
+read.\{c,h\} & Hookes the read system call \\
+hide\_module.\{c,h\} & Functionality needed for hiding the modules\\
+hide\_socket.\{c,h\} & Contains all necessary things for hiding sockets\\
+hide\_packet.\{c,h\} & Contains all necessary things for hiding packets\\
+port\_knocking.\{c,h\} & Functionlity needed for port knocking\\
+net\_keylog.\{c,h\} & Contains netpoll APIs for implementing network logging\\
+
+\end{tabular}
+
+
+
 
 \subsection{Obtaining address of kernel symbols}
 The kernel symbols are important in writing various modules. Many of the kernel symbols are not easily available through libraries 
@@ -233,7 +264,7 @@ kernel file system. If we do this by using first method our\_module will be easi
 % add how: One can count the number of modules from 
 So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
 If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
-In recent version of kernel these kernel objects are implemented as red-black trees. 
+In recent versions of kernel, the kernel objects are implemented as red-black trees. 
 There are functions defined in \texttt{rbtree.h} to perform this operation. 
 
 \begin{verbatim}
@@ -284,10 +315,37 @@ netpoll_send_UDP(np, sned_buf, send_len);
 
 \texttt{Getting the PID information}: This was quite simple, as the \texttt{current} macro was quite handy in this situation.
 \texttt{current} macro points to the \texttt{task\_struct} of the currently executing process. 
-\texttt{task\_struct} has the \texttt{pid} member
-. 
+\texttt{task\_struct} has the \texttt{pid} member. 
 
-\texttt{Setting up syslog-ng server}: TODO: gmc 
+
+\texttt{Setting up syslog-ng server}: One must set the \texttt{syslog-ng} server in the destination. 
+The following steps are for setting the syslog-ng server on ubuntu. 
+\begin{itemize}
+\item Install the syslog-ng server: sudo apt-get install syslog-ng
+
+\item Add these entries in \texttt{syslog-ng.conf} file (you can find the file under /etc/syslog-ng/ folder)
+\begin{verbatim}
+source syslog_udp {
+udp(port(514));
+};
+destination df_wrt0 {
+file("/var/log/rootkit_log.log");
+};
+log {
+source(syslog_udp);
+destination(df_wrt0);
+}
+filter f_wrt0 {
+host("Ip from you are getting the data");
+};
+log {
+source(syslog_udp);
+filter(f_wrt0);
+destination(df_wrt0);
+}
+\end{verbatim}
+
+\end{itemize}
 
 \subsection{Privilege escalation}
 To give the root privilages to any shell, we have to hack the credentials of the perticular shell and 
@@ -346,7 +404,7 @@ At first we wanted to understand how libcap tools work to sniff packets.
 \subsection{Port knocking}
 
 
-\section{vulnerabilities}
+\section{Vulnerabilities}
 
 \section{Final words}
 \end{document}
