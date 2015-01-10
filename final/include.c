@@ -71,6 +71,7 @@ get_path(unsigned int fd, char *path, size_t bufsiz)
 	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
 
 	/* ensure that the memory is actually allocated */
+	/* removed because it causes a kernel panic */
 	//if(buf == NULL) {
 	//	return -ENOMEM;
 	//}
