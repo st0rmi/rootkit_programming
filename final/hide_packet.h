@@ -3,8 +3,8 @@
 
 #include "include.h"
 
-void
-load_packet_hiding (char *);
+int
+load_packet_hiding (void);
 
 void
 unload_packet_hiding (void);

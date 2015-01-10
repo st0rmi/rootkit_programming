@@ -123,7 +123,7 @@ check_hide_fprefix(char *path)
  */
 int
 check_hide_process(int fd, char *d_name)
-{	
+{
 	int ret;
 	char dir[128];
 
