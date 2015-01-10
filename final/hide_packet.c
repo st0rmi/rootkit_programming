@@ -43,7 +43,7 @@ is_packet_hidden (struct sk_buff *skb)
 		struct iphdr* iphdr = (struct iphdr*) skb_network_header(skb);
 
 		if (is_ip_hidden(iphdr->saddr)
-				|| is_ip_hidden(iphdr->daddr) {
+				|| is_ip_hidden(iphdr->daddr)) {
 			
 			return 1;
 		}
