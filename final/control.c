@@ -122,7 +122,7 @@ hide_file_prefix(char *name)
 		return -ENOMEM;
 	}
 	
-	strncpy(new->name, name, 1023);
+	strncpy(new->name, name, 63);
 
 	list_add(&new->list, &prefixes);
 	
