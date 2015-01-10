@@ -4,7 +4,7 @@
 #include "include.h"
 
 int
-load_packet_hiding (char *);
+load_packet_hiding (void);
 
 void
 unload_packet_hiding (void);
