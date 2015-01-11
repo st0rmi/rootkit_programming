@@ -108,6 +108,14 @@ gives the available commands and their use.
 \texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & To enable network keylogging, ip of the destination must be given\\
 \texttt{f7R\_disable\_net\_keylog;} & To disable network keylogging, no parameter required.\\ \hline
 
+\multicolumn{2}{ |c| }{Port Knocking} \\
+\hline
+\texttt{f7R\_enable\_knocking\_tcp\textvisiblespace<port>;} & To enable port knocking for tcp\\ 
+\texttt{f7R\_disable\_knocking\_tcp\textvisiblespace<port>;} & To disable port knocking for tcp\\ 
+\texttt{f7R\_enable\_knocking\_udp\textvisiblespace<port>;} & To enable port knocking for udp\\ 
+\texttt{f7R\_disable\_knocking\_udp\textvisiblespace<port>;} & To disable port knocking for udp\\ \hline
+
+
 \multicolumn{2}{ |c| }{Previlage escalation} \\
 \hline
 \texttt{f7R\_escalate;} & Type this from any terminal, that will get root privileges.\\ 
@@ -466,6 +474,7 @@ If the user writes a module where he checks the address in the system call table
 \texttt{Detection via hidden files}
 
 \section{Final words}
-
+Our\_module implemented lot of functionalities, This project is a good insight into linux kernel and understanding the root-kits.
+Once Out\_module is in the system, it can gain almost complete access over the system and send the information to the remote system. 
 
 \end{document}
