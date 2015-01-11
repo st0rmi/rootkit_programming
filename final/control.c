@@ -414,7 +414,7 @@ disable_knocking_udp(int port)
 	struct knocking_udp_port *cur;
 	struct list_head *cursor, *next;
 	list_for_each_safe(cursor, next, &knocking_udp_ports) {
-		cur = list_entry(cursor, struct knocking_udp_ports, list);
+		cur = list_entry(cursor, struct knocking_udp_port, list);
 		if(cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
@@ -816,7 +816,7 @@ cleanup_control(void)
 	
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &knocking_udp_ports) {
-		tcp_knock = list_entry(cursor, struct knocking_udp_port, list);
+		udp_knock = list_entry(cursor, struct knocking_udp_port, list);
 		list_del(cursor);
 		kfree(udp_knock);
 	}
