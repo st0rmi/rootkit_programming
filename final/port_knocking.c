@@ -51,11 +51,12 @@ is_port_blocked (struct sk_buff *skb) {
 			if(port_order[tcp_state] == port) {
 				if(tcp_state == 0) {
 					getnstimeofday(&time);
+					tcp_state++;
 				} else {
 					struct timespec cur;
 					getnstimeofday(&cur);
-
-					if(cur.tv_sec - time.tv_sec > 10) {
+					
+					if(cur.tv_sec - time.tv_sec > 120) {
 						tcp_state = 0;
 					} else {
 						tcp_state++;
