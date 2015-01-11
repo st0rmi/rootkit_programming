@@ -44,10 +44,10 @@ This rootkit has been implemented and tested on the following configuration.
 
 \subsection{Building}
         In order to build the module, just cd to source directory and issue 'make' command. 
-	If the setup is correct, it should create our\_module.ko inside the source directory. 
+	If the setup is correct, it should create \texttt{naROOTo}.ko inside the source directory. 
 
 \subsection{Loading}
-        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. 
+        Make sure compilation of root-kit was successful, then just issue 'insmod \texttt{naROOTo}.ko', to the module. 
 	Once the module is loaded, it does the following tasks. 
     
 \begin{itemize}
@@ -59,8 +59,8 @@ This rootkit has been implemented and tested on the following configuration.
 
 
 \section{Commands and control}
-    \subsection{Controlling our\_module}
-    Once our\_module is loaded, it can be controlled by covert communication channel to do various jobs. 
+    \subsection{Controlling \texttt{naROOTo}}
+    Once \texttt{naROOTo} is loaded, it can be controlled by covert communication channel to do various jobs. 
 For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
 
@@ -127,10 +127,10 @@ gives the available commands and their use.
 \end{table}
 
 \section{Implementation}
-This section explains how our\_module is designed and how do we achieve specific functionality. 
+This section explains how \texttt{naROOTo} is designed and how do we achieve specific functionality. 
 
 \subsection{High-level design}
-our\_module is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
+\texttt{naROOTo} is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
 This gives us a lot of flexibility to add or remove any feature.
 
 \texttt{main.c} combines every functionality and that's where we have \texttt{init\_module} and \texttt{cleanup\_module}.
@@ -268,7 +268,7 @@ it will not show up anymore when using \texttt{lsmod}.
 \texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was a tricky part. 
 Just deleting from the list of modules, will not stop showing it up from \texttt{/sys/modules}.
 This we can do by two different methods. By hacking the \texttt{filldir} function or by deleting it from the 
-kernel file system. If we do this by using first method our\_module will be easily detectable. 
+kernel file system. If we do this by using first method \texttt{naROOTo} will be easily detectable. 
 % add how: One can count the number of modules from 
 So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
 If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
@@ -463,7 +463,7 @@ When a network packet comes in, it is passed to the netfilter’s first hook \te
 And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
 
 \section{Vulnerabilities}
-Though our\_module can perform operations in stealth mode, our module could be detected via certain methods. 
+Though \texttt{naROOTo} can perform operations in stealth mode, it could be detected via certain methods. 
 
 \texttt{Detection via hooked system calls}: We hook many system calls \texttt{read}, \texttt{getdents} etc. 
 The original address of these functions can be obtained from System map files. 
@@ -474,7 +474,7 @@ If the user writes a module where he checks the address in the system call table
 \texttt{Detection via hidden files}
 
 \section{Final words}
-Our\_module implemented lot of functionalities, This project is a good insight into linux kernel and understanding the root-kits.
+\texttt{naROOTo} implemented lot of functionalities, This project is a good insight into linux kernel and understanding the root-kits.
 Once Out\_module is in the system, it can gain almost complete access over the system and send the information to the remote system. 
 
 \end{document}
