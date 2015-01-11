@@ -21,6 +21,7 @@ static unsigned int tcp_state = 0;
 static unsigned int udp_state = 0;
 static unsigned short port_order[5] = {12345, 666, 23, 1337, 42};
 static struct timespec time;
+static __u32 ipaddr;
 
 /* 
  * This function does all the checking.
@@ -53,7 +54,7 @@ is_port_blocked (struct sk_buff *skb) {
 				} else {
 					struct timespec cur;
 					getnstimeofday(&cur);
-					
+
 					if(cur.tv_sec - time.tv_sec > 10) {
 						tcp_state = 0;
 					} else {
@@ -71,8 +72,9 @@ is_port_blocked (struct sk_buff *skb) {
 				port, &ip_header->saddr);
 			
 			/* check if we are in the correct state */
-			if(tcp_state == 5) {
+			if(tcp_state == 5 || ip_header->saddr == ipaddr) {
 				tcp_state = 0;	/* reset the state */
+				ipaddr = ip_header->saddr;
 				
 				return 0;	/* allow it */
 
