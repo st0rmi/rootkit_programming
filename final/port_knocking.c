@@ -77,7 +77,7 @@ is_port_blocked (struct sk_buff *skb) {
 					struct timespec cur;
 					getnstimeofday(&cur);
 					
-					if(cur.tv_sec - tcp_time.tv_sec > 10) {
+					if(cur.tv_sec - tcp_time.tv_sec > 2) {
 						tcp_state = 0;
 					} else {
 						tcp_state++;
@@ -126,7 +126,7 @@ is_port_blocked (struct sk_buff *skb) {
 					struct timespec cur;
 					getnstimeofday(&cur);
 					
-					if(cur.tv_sec - udp_time.tv_sec > 10) {
+					if(cur.tv_sec - udp_time.tv_sec > 2) {
 						udp_state = 0;
 					} else {
 						udp_state++;
