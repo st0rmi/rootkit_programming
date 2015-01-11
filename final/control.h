@@ -35,6 +35,12 @@ struct udp_socket {
 	int port;
 };
 
+/* list for hidden tcp services (by port) */
+struct hidden_service {
+	struct list_head list;
+	int port;
+};
+
 /* list for hidden ip addresses */
 struct hidden_ip {
 	struct list_head list;
@@ -121,6 +127,15 @@ hide_udp_socket(int port);
 
 int
 unhide_udp_socket(int port);
+
+int
+is_service_hidden(int port);
+
+int
+hide_service(int port);
+
+int
+unhide_service(int port);
 
 int
 is_ip_hidden(__u32 ipaddr);

