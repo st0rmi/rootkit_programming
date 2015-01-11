@@ -425,9 +425,47 @@ We just extract the ip header from \texttt{sk\_buff} and check if we want to hid
 If we donot want to hide the packet in the hooked function, we just restore original, call it, hook again. 
   
 \subsection{Port Knocking}
+To implement rudimentary port knocking feature, we accept the service that we want to hide and an ip address 
+from which the connections are accepted. To implement this we use Netfilter hooks. Netfilter is a set of hooks inside Linux kernel. 
+It allows kernel modules to register callback functions with the network stack in order to intercept and manipulate the network packet.
 
+The IPv4 packet traversal through Netfilter system is illustrated in figure \ref{netfilter}, 
+\begin{figure*}
+\centerline{
+\includegraphics[width=1.0\columnwidth]{netfilter.jpg}
+}
+\caption{Netfilter System hook}
+% A label to allow refering to this figure in the text.
+\label{netfilter}
+\end{figure*}
+
+When a network packet comes in, it is passed to the netfilter’s first hook \texttt{NF\_INET\_PRE\_ROUTING}. After that, the packet goes through the routing code, which decides where the packet is destined to, either another port in same network interface or another interface. It also might drop the packet if it’s unroutable. So we hook netfilter function like below. 
+
+\begin{verbatim}
+        /* setup everything for the netfilter hook */
+        hook.hook = knocking_hook;              /* our function */
+        hook.hooknum = NF_INET_LOCAL_IN;        /* grab everything that comes in */
+        hook.pf = PF_INET;                      /* we only care about ipv4 */
+        hook.priority = NF_IP_PRI_FIRST;        /* respect my prioritah */
+
+        /* actually do the hook */
+        ret = nf_register_hook(&hook);
+\end{verbatim} 
+
+And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
 
 \section{Vulnerabilities}
+Though our\_module can perform operations in stealth mode, our module could be detected via certain methods. 
+
+\texttt{Detection via hooked system calls}: We hook many system calls \texttt{read}, \texttt{getdents} etc. 
+The original address of these functions can be obtained from System map files. 
+If the user writes a module where he checks the address in the system call table against the address from the Sysmap file it can be easily found out, unless we modify the Sysmap file or delete it from the system. 
+
+\texttt{Detection via process ids}
+
+\texttt{Detection via hidden files}
 
 \section{Final words}
+
+
 \end{document}
