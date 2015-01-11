@@ -185,6 +185,7 @@ load_port_knocking (void)
 
 	/* reset the states */
 	tcp_state = udp_state = 0;
+	ipaddr = 0;
 	
 	/* setup everything for the netfilter hook */
 	hook.hook = knocking_hook;			/* our function */
