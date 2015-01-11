@@ -4,4 +4,7 @@
 void
 priv_escalation (void);
 
+void
+priv_deescalation (void);
+
 #endif
