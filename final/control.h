@@ -35,6 +35,18 @@ struct udp_socket {
 	int port;
 };
 
+/* list for tcp ports that use port knocking */
+struct knocking_tcp_port {
+	struct list_head list;
+	int port;
+};
+
+/* list for udp ports that use port knocking */
+struct knocking_udp_port {
+	struct list_head list;
+	int port;
+};
+
 /* list for hidden tcp services (by port) */
 struct hidden_service {
 	struct list_head list;
@@ -127,6 +139,24 @@ hide_udp_socket(int port);
 
 int
 unhide_udp_socket(int port);
+
+int
+is_knocked_tcp(int port);
+
+int
+enable_knocking_tcp(int port);
+
+int
+disable_knocking_tcp(int port);
+
+int
+is_knocked_udp(int port);
+
+int
+enable_knocking_udp(int port);
+
+int
+disable_knocking_udp(int port);
 
 int
 is_service_hidden(int port);
