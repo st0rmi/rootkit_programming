@@ -62,10 +62,18 @@ int init_module (void)
 		ROOTKIT_DEBUG("Error while loading port knocking! Aborting insertion.\n");
 		return ret;
 	}
+	
+	/* autoload functionality */
+	//ROOTKIT_DEBUG("****************************************\n");	
+	//ROOTKIT_DEBUG("Auto-loading functionality...\n");
+	//ROOTKIT_DEBUG("****************************************\n");
+	
+	
+	
 
 	ROOTKIT_DEBUG("****************************************\n");	
 	ROOTKIT_DEBUG("Loading was successful!\n");
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 	return 0;
 }
 
