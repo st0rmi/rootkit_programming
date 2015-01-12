@@ -16,8 +16,8 @@
 
 \geometry{margin=2.5cm}
 
-\title{Rootkit Gruppe 4}
-\subtitle{TUM \\Chair of IT Security\\  Rootkit Programming 2014/2015}
+\title{naROOTo - Rootkit Gruppe 4}
+\subtitle{TUM \\Chair of IT Security\\  Rootkit Programming WS2014/15}
 \author{Martin Herrman \and Gurusiddesha Chandrasekhara}
 \date{\today}
 
@@ -27,53 +27,49 @@
 \newpage
 
 \section{Introduction}
-This root-kit has been implemented as part of the "Root-kit programming" lab course. 
-It is a single Linux Kernel Module(LKM) and can be inserted into the Linux kernel 3.16 or later versions. 
-It explains how to acheive many root-kit functionalities just by manipulation of kernel data structures and hooking few system calls. 
-Controlled correctly, it does so much work such as hiding files, hiding processes, hiding sockets, keylogging, 
-sending key strokes to remote machine, hiding network packets, privilege escalation.   
+This rootkit has been implemented as part of the "Rootkit programming" lab course of the TUM in W2014/14. 
+It is a single Linux Kernel Module (LKM) that can be inserted into the Linux kernel 3.16. 
+It implements functionality such as keylogging (both locally to a file as well as remotely using the syslog protocol), file hiding, process hiding, socket hiding, packet hiding, module hiding, port knocking, and privilege escalation. Each functionality can be controlled by a covert communication channel which is further explained in chapter \ref{sec:command_and_control}.
+Chapter \ref{sec:compiling_and_installing} gives an overview of the system requirements and describes how to properly build, insert, and unload naROOTo.
+Chapter \ref{sec:implementation} discusses the implementations of the different functionalities while chapter \ref{sec:vulnerabilities} points to a few vulnerabilities of the rootkit.
 
-Compilation, installation and controlling is explained in the coming sections.
-
-\section{Compiling and Installing}
+\section{Compiling and Installing}\label{sec:compiling_and_installing}
+Building and using naROOTo is fairly easy even though there are a peculiarities that need to be heeded.
 \subsection{System configuration}
-This rootkit has been implemented and tested on the following configuration.
+This rootkit has been implemented and tested on a very specific system. Even though may work on other systems -- especially on similar ones -- we recommend using the following configuration:
 \begin{itemize}
-    \item Linux Kernel 3.16.4 (Vanilla kernel) 
+    \item VirtualBox VM (5GB HDD, 600MB memory) emulating a single x86-amd64 CPU
+    \item Debian Wheezy 7.6 x86-64
+    \item Linux Kernel 3.16.4 x86-64 (Vanilla) built using the configuration of the Debian kernel as a base
 \end{itemize}
 
 \subsection{Building}
-        In order to build the module, just cd to source directory and issue 'make' command. 
-	If the setup is correct, it should create \texttt{naROOTo}.ko inside the source directory. 
+Building requires the kernel sources and a valid System.map file. To build the LKM simply enter the source folder and issue the command \texttt{make}.
+This will compile the rootkit with all its functionality. To enable debugging to kernel messages edit the \texttt{Makefile} to include to compiler flag \texttt{-DDEBUG}.
+If the build was successful the file \texttt{naROOTo}.ko as well as other object files will be created in the source folder.
 
 \subsection{Loading}
-        Make sure compilation of root-kit was successful, then just issue 'insmod \texttt{naROOTo}.ko', to the module. 
-	Once the module is loaded, it does the following tasks. 
-    
-\begin{itemize}
-    \item It hides itself from the user. 
-    \item Creates a  file called rootkit\_keylog.log inside the current directory and hides it (It logs any keystrokes entered by the user).
-    \item Hides the process id which provides the remote shell access. 
-    \item Hides the network connection to the remote shell and it only accepts connections when you politely knock beforehand.
-    \end{itemize}
+The rootkit can be inserted by issuing the command \texttt{insmod narooto.ko} as \texttt{root}.
+Afterwards it can be controlled by the covert communication channel described in the following chapter \ref{sec:command_and_control}.
 
+\section{Command and control}\label{sec:command_and_control}
+\subsection{Controlling \texttt{naROOTo}}
+After \texttt{naROOTo} is loaded, it can be controlled by a covert communication channel. 
+Commands are issued using the stdin of a shell.
+One just has to type them, no special permissions are required.
+Once a command is entered completely it will be executed immediately. Pressing \texttt{enter} is neither required nor suggested as the history of entered shell commands is logged on most systems.
 
-\section{Commands and control}
-    \subsection{Controlling \texttt{naROOTo}}
-    Once \texttt{naROOTo} is loaded, it can be controlled by covert communication channel to do various jobs. 
-For this, we hook the read system call and intercept data from stdin and take actions for each existing  commands. 
-We use a state machine model (which will be described later) to read the data and look for specific commands entered. 
+Each command starts with the same prefix: \texttt{f7R\_}.
+This is supposed to ensure that a regular user will not (de-)activate any rootkit functionality by accident and therefore reveal its use.
+After the prefix, the actual command is entered.
+Commands may or may not contain a single parameter.
+Multiple parameters are not supported at this time.
+They can be supplied by separating them from the command by a single space character.
+To finish the command and execute it (if it is valid), a semicolon is used.
 
-%TODO : Add command details once done with coding
-Each command starts with a prefix(For detecting purpose), \texttt{f7R\_} and ends with ;. 
-After the prefix one can enter the actual command. The format of the command looks like,
-\\~
-\texttt{f7R\_command\textvisiblespace parameter;}
+The basic syntax of any command therefore looks like this: \texttt{f7R\_command\textvisiblespace <optional\_parameter>;} 
 
-After you typed the command, pressing \texttt{return} or \texttt{enter} is not necessary, you can press \texttt{Ctrl + C} to avoid bash error. 
-Our module will execute as soon as the suffix(;) is entered, provided the command exists. 
-The table %ADD table reference
-gives the available commands and their use. 
+The following table \ref{tab:commands} lists all commands with a short description of their functionality.
 
 \begin{table}
 %\centering
@@ -81,45 +77,55 @@ gives the available commands and their use.
 \hline
 \multicolumn{2}{ |c| }{File hiding} \\
 \hline
- \texttt{f7R\_hide\_file\textvisiblespace<path>;} & \texttt{<path>} is the absolute path of the file to hide \\
- \texttt{f7R\_unhide\_file\textvisiblespace<path>;} & To unhide the previously hidden file \\ \hline
+ \texttt{f7R\_hide\_file\textvisiblespace<path>;} & Hides a single file or folder. \texttt{<path>} is the absolute path of the file to hide. \\
+ \texttt{f7R\_unhide\_file\textvisiblespace<path>;} & Unhides a previously hidden file or folder. \\
+  & \\
+ \texttt{f7R\_hide\_fprefix\textvisiblespace<prefix>;} & Hides all files and folders beginning with the prefix \texttt{<prefix>}. \\  & All files and subfolders of a hidden folder are also hidden. \\
+ \texttt{f7R\_unhide\_fprefix\textvisiblespace<prefix>;} & Removes the prefix \texttt{<prefix>} from the list of prefixes to hide. \\ \hline
 
 \multicolumn{2}{ |c| }{Process hiding} \\
 \hline
-\texttt{f7R\_hide\_process\textvisiblespace<pid>;} & \texttt{<pid>} is the id of the process to be hidden\\
-\texttt{f7R\_unhide\_process\textvisiblespace<pid>;} & To unhide the process by it's pid\\ \hline
-
-
-\multicolumn{2}{ |c| }{Hiding sockets} \\
-\hline
-\texttt{f7R\_hide\_tcp\textvisiblespace<port>;} & \texttt{<port>} is the port number of tcp socket to be hidden\\
-\texttt{f7R\_unhide\_tcp\textvisiblespace<port>;} & To unhide the tcp socket\\
-\texttt{f7R\_hide\_udp\textvisiblespace<port>;} & \texttt{<port>} is the port number of udp socket to be hidden\\
-\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & To unishie the udp socket\\ \hline
+\texttt{f7R\_hide\_process\textvisiblespace<pid>;} & Hides a specific process. \texttt{<pid>} is the id of the process to be hidden. \\
+\texttt{f7R\_unhide\_process\textvisiblespace<pid>;} & Unhides a previously hidden process. \\ \hline
 
 \multicolumn{2}{ |c| }{Module hiding} \\
 \hline
-\texttt{f7R\_hide\_module\textvisiblespace<name>;} & \texttt{<name>} is the name of the module to be hidden\\
-\texttt{f7R\_unhide\_module\textvisiblespace<name>;} & to unhide the hidden module\\ \hline
+\texttt{f7R\_hide\_module\textvisiblespace<name>;} & Hides any currently loaded LKM. \\ & \texttt{<name>} is the name of the module to be hidden. \\
+\texttt{f7R\_unhide\_module\textvisiblespace<name>;} & Unhides a previously hidden LKM. \\ \hline
 
-
-\multicolumn{2}{ |c|}{Network key logging} \\
+\multicolumn{2}{ |c| }{Hiding sockets} \\
 \hline
-\texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & To enable network keylogging, ip of the destination must be given\\
-\texttt{f7R\_disable\_net\_keylog;} & To disable network keylogging, no parameter required.\\ \hline
+\texttt{f7R\_hide\_tcp\textvisiblespace<port>;} & Hides a TCP socket from both the \texttt{ss} and the \texttt{netstat} command. \\ & \texttt{<port>} is the port number of the TCP socket to be hidden. \\
+\texttt{f7R\_unhide\_tcp\textvisiblespace<port>;} & Unhides a previously hidden TCP socket. \\
+& \\
+\texttt{f7R\_hide\_udp\textvisiblespace<port>;} & Hides a UDP socket from both the \texttt{ss} and the \texttt{netstat} command. \\ & \texttt{<port>} is the port number of the UDP socket to be hidden. \\
+\texttt{f7R\_unhide\_udp\textvisiblespace<port>;} & Unhides a previously hidden UDP socket. \\ \hline
 
-\multicolumn{2}{ |c| }{Port Knocking} \\
+\multicolumn{2}{ |c| }{Hiding packets} \\
 \hline
-\texttt{f7R\_enable\_knocking\_tcp\textvisiblespace<port>;} & To enable port knocking for tcp\\ 
-\texttt{f7R\_disable\_knocking\_tcp\textvisiblespace<port>;} & To disable port knocking for tcp\\ 
-\texttt{f7R\_enable\_knocking\_udp\textvisiblespace<port>;} & To enable port knocking for udp\\ 
-\texttt{f7R\_disable\_knocking\_udp\textvisiblespace<port>;} & To disable port knocking for udp\\ \hline
+\texttt{f7R\_hide\_ip\textvisiblespace<ip>;} & Hides both TCP and UDP packets from packet sniffers such as \texttt{tcpdump}. \\ & \texttt{<ip>} is the ip address of the host whose packets are supposed to be hidden. \\
+\texttt{f7R\_unhide\_ip\textvisiblespace<port>;} & Unhides previously hidden packets. \\
+& \\
+\texttt{f7R\_hide\_service\textvisiblespace<port>;} & Hides all incoming TCP packets to a specified service. \\ & \texttt{<port>} is the port number of the service to be hidden. \\
+\texttt{f7R\_unhide\_service\textvisiblespace<port>;} & Unhides a previously hidden service. \\ \hline
 
-
-\multicolumn{2}{ |c| }{Previlage escalation} \\
+\multicolumn{2}{ |c| }{Port knocking} \\
 \hline
-\texttt{f7R\_escalate;} & Type this from any terminal, that will get root privileges.\\ 
-\texttt{f7R\_deescalate;} & Revokes the root privileges of a shell.\\ \hline
+\texttt{f7R\_enable\_knocking\_tcp\textvisiblespace<port>;} & Enables port knocking for a specified TCP service. \\ & \texttt{<port>} is the port number of the service to be hidden. \\
+\texttt{f7R\_disable\_knocking\_tcp\textvisiblespace<port>;} & Disable port knocking for a specified TCP service. \\ 
+ & \\
+\texttt{f7R\_enable\_knocking\_udp\textvisiblespace<port>;} & Enables port knocking for a specified UDP service. \\ & \texttt{<port>} is the port number of the service to be hidden. \\
+\texttt{f7R\_disable\_knocking\_udp\textvisiblespace<port>;} & Disable port knocking for a specified UDP service. \\ \hline
+
+\multicolumn{2}{ |c|}{Network keylogging} \\
+\hline
+\texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & Enables network keylogging. \\ & \texttt{<ip>} specifies the IP address of the syslog-ng server. \\
+\texttt{f7R\_disable\_net\_keylog;} & Disabled network keylogging. \\ \hline
+
+\multicolumn{2}{ |c| }{Privilege escalation} \\
+\hline
+\texttt{f7R\_escalate;} & Provides superuser access to a terminal. \\ 
+\texttt{f7R\_deescalate;} & Restores the previous permissions of a terminal.\\ \hline
 
 \end{tabular}
 \caption{Commands to control the rootkit}
