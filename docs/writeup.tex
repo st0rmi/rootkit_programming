@@ -128,81 +128,84 @@ The following table \ref{tab:commands} lists all commands with a short descripti
 \texttt{f7R\_deescalate;} & Restores the previous permissions of a terminal.\\ \hline
 
 \end{tabular}
-\caption{Commands to control the rootkit}
+\caption{Commands to control \texttt{naROOTo}}
 \label{tab:commands}
 \end{table}
 
 \section{Implementation}
-This section explains how \texttt{naROOTo} is designed and how do we achieve specific functionality. 
+This chapter discusses the implementation details of \texttt{naROOTo}. 
 
 \subsection{High-level design}
-\texttt{naROOTo} is divided into many sub-modules(files). Each submodules have .h (header files) and .c (implemetation files).
-This gives us a lot of flexibility to add or remove any feature.
+\texttt{naROOTo} was programmed using a modular approach. Each submodule represented by a header and a source file serves a very specific purpose.
+This makes it very easy to implement new functionality should the new arise in the future.
 
-\texttt{main.c} combines every functionality and that's where we have \texttt{init\_module} and \texttt{cleanup\_module}.
-The following table describes the functionality of each file.
+\texttt{main.c} is the entry point for the LKM. In its \texttt{init\_module} function it enables the different functionalities by calling the appropriate functions. On unloading, \texttt{cleanup\_module} disables all of \texttt{naROOTo}'s features.
+The following table \ref{tab:files} describes the purpose of each component. \\
 
 
 
 \begin{tabular}{l*{6}r}
 File name             & Functionality \\
 \hline
-gensysmap.sh & Bach script to generate sysmap.h file\\
-control.\{c,h\} & Manages the data structures for different hiding methods\\
-include.\{c,h\} & contains many different helper functions   \\
-covert\_communication.\{c,h\} & All functionality needed for the covert communication channel \\
-getdents.\{c,h\} & contains everything needed for the manipulated getdents syscall\\
-read.\{c,h\} & Hookes the read system call \\
-hide\_module.\{c,h\} & Functionality needed for hiding the modules\\
-hide\_socket.\{c,h\} & Contains all necessary things for hiding sockets\\
-hide\_packet.\{c,h\} & Contains all necessary things for hiding packets\\
-port\_knocking.\{c,h\} & Functionlity needed for port knocking\\
-net\_keylog.\{c,h\} & Contains netpoll APIs for implementing network logging\\
+gensysmap.sh & Shell script that generates sysmap.h file.\\
+main.\{c,h\} & Module (un-)loading and basic configuration.\\
+control.\{c,h\} & Control API for the different functionalities.\\
+include.\{c,h\} & Helper functions.\\
+covert\_communication.\{c,h\} & Implementation of the covert communication channel.\\
+getdents.\{c,h\} & Hooking of the \texttt{getdents} syscall and related functionality.\\
+read.\{c,h\} & Hooking of the \texttt{read} syscall and related functionality.\\
+hide\_module.\{c,h\} & Functionality needed for hiding kernel modules.\\
+hide\_socket.\{c,h\} & Functionality needed for hiding TCP and UDP sockets.\\
+hide\_packet.\{c,h\} & Functionality needed for hiding packets. \\
+port\_knocking.\{c,h\} & A port knocking implementation.\\
+net\_keylog.\{c,h\} & Functionality needed for network keylogging.\\
 
 \end{tabular}
 
-
-
-
 \subsection{Obtaining address of kernel symbols}
-The kernel symbols are important in writing various modules. Many of the kernel symbols are not easily available through libraries 
-and many of them are not exported in recent kernel versions (for eg. \texttt{sys\_call\_table}).
-The \texttt{System.map.<kernel version>} file under \texttt{/boot} directory stores the address of the kernel symbols and is of the form, 
+The kernel symbols are important in writing various modules.
+Many of them are not easily available through libraries or are not exported in recent kernel versions (e.g. the \texttt{sys\_call\_table}).
+The \texttt{System.map.<kernel version>} file in the \texttt{/boot} directory lists the addresses of all kernel symbols in the form:
 \begin{verbatim}
 address type symbol_name
 \end{verbatim}
 
-We wrote a simple bash script to take these symbols and define them in a \texttt{sysmap.h} file. 
-Each line of the file looks like, 
+We wrote a simple shell script to convert this file into a format which can be used by a LKM.
+This script generates the \texttt{sysmap.h} file by parsing it using regular expressions. 
+The lines of the generated file then look like this:
 
 \begin{verbatim}
 #define sysmap_symbol_name address
 \end{verbatim}
 
-When we require a particular kernel symbol, we can just type cast the corresponding symbol and use it. 
+When a particular kernel symbol is required, its address can just be type-casted to the correct type or function signature. 
 
-\texttt{System call table}: The system call table lists the system calls available in that specific Linux kernel version. 
-It could also be thought of as an API for the interface between user space and kernel space. 
-In order to manipulate the system calls(which we explain in upcoming sections), our first job was to access the system call table.
-We can access the system call table from the \texttt{sysmap.h} file like this,
+A good example for this is the system call table which are further described in chapter \ref{sec:implementation_system_call_hooking}.
+We can access the system call table from in our module like this:
 
 \begin{verbatim}
 void **sys_call_table = (void *) sysmap_sys_call_table;
 \end{verbatim}
 
-\subsection{System call hooking}
-System call hooking is a well known method in writing root-kits. 
-We know that all system call addresses are in \texttt{sys\_call\_table} and they will be executed according to requirement.
-The fundamental idea is that, we change system call table address to our custom function, 
-while store pointer to the original function. This way whenever the function is called, 
-it will first land in our {\em manipulated} function. 
-We can play with the arguments and modify(or keep original) them according to the need and call the original function with the manipulated(or original) set of arguments. 
+\subsection{System call hooking}\label{sec:implementation_system_call_hooking}
+The system call table is an array of pointers to all available system calls of the Linux kernel and can be thought of as an API for accessing functionality that resides in kernel space.
+A basic technique of writing rootkits is manipulating specific system calls.
 
-\texttt{Disabling and enabling write protection}: 
-We cannot just modify the system call table since it is write protected. 
-So we have to disable the write protection before modification.
-For this, we found a mechanism to disable the write protection for the whole processor.
-By using assembly code we modify \texttt{cr0} register value.
+There are several ways to do this, the easiest probably is manipulating the system call table itself to make specific system calls point to different functions of the same signature.
+When a user space process now calls that specific system call, it is actually directed to the (possibly malicious) function that was inserted.
+The original system call can be called by saving its pointer. This way a LKM can completely control what the user does (or doesn't) see.
+
+Another more sophisticated way of hooking system calls is manipulating the function directly.
+One can insert assembly instructions that cause a jump to a different location that contains a manipulated version of the system call.
+If one wants to call the original system call, however, the overwritten code needs to be restored first.
+
+Both ways are used in \texttt{naROOTo} and both require one additional feature to work: disabling the memory write protection. 
+Because such code is usually in regions that cannot be overwritten for security reasons, we have to disable it first.
+We do this by flipping a bit in the control register cr0 of the CPU.
+This tells it to ignore any write protections and go ahead with the instructions.
+Because this is written directly in assembly, those two functions are extremely portable and cannot be deprecated easily.
+This operation is possible because we are operating in kernel mode (CPU ring 0) and not user mode.
+The write protection of the CPU can be disabled and afterwards reenabled by using the following functions:
 
 \begin{verbatim}
 static void disable_page_protection(void) {
@@ -226,41 +229,42 @@ static void enable_page_protection(void) {
 }
 \end{verbatim}
 
-As you can notice in the code, \texttt{cr0} is a control register, 
-The 16th bit controls page protection enforcement: 
-toggling this bit turns of the write protection for the complete processor.
-We can do this in kernel space, because the code is executed at privilege level (ring) 0. 
+\subsection{File hiding}
+To hide files, \texttt{naROOTo} uses a manipulated \texttt{getdents} system call.
+The manipulated function calls the original to get its output.
+This output is then scanned for files or folders that need to be hidden.
+Each file is represented by a \texttt{struct linux\_dirent} which contains additional information like its name.
+If it is decided that a file is supposed to be hidden, the memory of the following \texttt{linux\_dirent}s is moved forward (overwriting that entry) and the return value is adapted accordingly.
+This way the entry is no longer visible to the user space process that called \texttt{getdents}.
+
+To also hide symbolic links pointing to hidden files, the system call \texttt{readlink} is used.
+If the link points to a hidden file, the link is also hidden.
+This also works for nested links as the call is looped until either a true file is found or it is determined that the symbolic link is to be hidden.
+Because system calls are not intended to be called from kernel space, we had to disable the kernel checking for this.
+This was done by the following lines that tell the kernel to also execute system calls if the memory that was allocated for them belongs to the kernel:
+
+\begin{verbatim}
+/* tell the kernel to ignore kernel-space memory in syscalls */
+old_fs = get_fs();
+set_fs(KERNEL_DS);
+
+[...]
+	
+/* reset the kernel */
+set_fs(old_fs);
+\end{verbatim}
 
 \subsection{Process Hiding}
-The task was to hide process ids, which user enters when inserting the module. 
-To check the processes, we can do \texttt{ls} on \texttt{/proc} directory. 
-\texttt{ps} also does an \texttt{ls} on \texttt{/proc} folder.   
-\texttt{strace} on \texttt{ls} gave us that, it calls getndents and reads each linux\_dirent structures. 
-\texttt{d\_reclen} is the length of each structure. 
+To hide processes, \texttt{naROOTo} uses the already implemented file hiding.
+This is possible because tools like \texttt{ps} look at the \texttt{/proc}-filesystem which contains a subfolder for each process.
+All that is left to implement is to check if the current folder matches \texttt{/proc} (which can be done by looking at the file descriptor \texttt{fd}) and if the file name matches a PID of a hidden process. If both is the case, the file is hidden and tools like \texttt{ps} will no longer display it.
 
 \begin{verbatim}
 int getdents(unsigned int fd, struct linux\_dirent *dirp,
                     unsigned int count);
 \end{verbatim}
 
-
-So to do this we hook \texttt{getdents} system call. 
-We first compare if \texttt{fd} matches \texttt{/proc} folder. 
-If it matches, then iterate over each entry in the directory.
-dirp->d\_name is the name of each entry inside the folder. 
-So we first need to convert this char entry to integer and compare with the pid which we want to hide.
-If it matches, then we delete the entry. 
-
-\subsection{File Hiding}
-The task was to hide any file names starting with rootkit\_ and to hide any open file descriptors, 
-starting with that name. we hook \texttt{getdents} function as we did it for process hiding. 
-We simply call original getdents function and iterate over linux\_dirent structures.
-we search for d\_name matching to a prefix, \texttt{rootkit\_} or \texttt{.rootkit\_}. 
-If we find the match, we just {\em delete} it by moving the pointer using \texttt{memmove}.
-
-@mher:Could you please add details for hiding symlinks 
-
-\subsection{Code Hiding}
+\subsection{Module hiding}
 We can get the information on loaded modules using \texttt{lsmod}
 (which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
 
@@ -362,19 +366,14 @@ destination(df_wrt0);
 \end{itemize}
 
 \subsection{Privilege Escalation}
-To give the root privileges to any shell, we have to hack the credentials of the particular shell and 
-manipulate them. There is a structure called \texttt{cred}: 
-It holds the credentials of the respective process. These credentials are uids and gids. 
-There are functions available from Linux kernel, to get these credentials and change them. 
+To grant superuser privileges to any shell, \texttt{naROOTo} manipulates the credentials of the particular process.
+This is done by setting all ids to 0 in the corresponding \texttt{struct cred}.
+The original values are stored to be able to return to regular privileges if necessary.
 
 \begin{verbatim}
 struct cred * prepare_creds();
 commit_creds(struct cred *);
 \end{verbatim}
-
-Once we get the credentials, we can assign all the ids to 0, and we will give the root access to the shell. 
-Since we have hooked read system call, 
-we can type \texttt{escalate} from any terminal and it gets the root access. 
 
 \subsection{Socket Hiding}
 The task was to hide any existing TCP/UDP sockets from the user. 
@@ -469,18 +468,30 @@ When a network packet comes in, it is passed to the netfilter’s first hook \te
 And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
 
 \section{Vulnerabilities}
-Though \texttt{naROOTo} can perform operations in stealth mode, it could be detected via certain methods. 
+Even though \texttt{naROOTo} utilizes multiple techniques to hide itself, there are still a few weaknesses that allow its detection.
 
-\texttt{Detection via hooked system calls}: We hook many system calls \texttt{read}, \texttt{getdents} etc. 
-The original address of these functions can be obtained from System map files. 
-If the user writes a module where he checks the address in the system call table against the address from the Sysmap file it can be easily found out, unless we modify the Sysmap file or delete it from the system. 
+\subsection{Detection via hooked system calls}
+Because \texttt{naROOTo} manipulates some pointers in the system call table, it is easy to detect this way.
+One could scan the system call table and compare it to a clean one if available (or the addresses of the specific functions in the System.map file).
+A mismatching pointer indicates a hooked system call and threrefore an infection with a rootkit.
 
-\texttt{Detection via hidden processes}
+\subsection{Detection via hidden processes}
+Because \texttt{naROOTo} just hides the processes from the file system, there are a number of ways to detect this.
+It is still possible to send signals to hidden process, so a \texttt{kill -0 <PID>} will return no error message on a hidden process while it would return one on a not existing one.
+One could furthermore scan the kernel structure containing all processes (\texttt{struct task\_struct}) for processes and compare it to the displayed ones.
 
 \texttt{Detection via hidden files}
+Because our rootkit is running in a VM one can mount the disk image of a not running VM and compare its file system to the one displayed by the kernel. 
+Any mismatches indicate hidden files.
 
-\section{Final words}
-\texttt{naROOTo} implemented lot of functionalities, This project is a good insight into linux kernel and understanding the root-kits.
-Once Out\_module is in the system, it can gain almost complete access over the system and send the information to the remote system. 
+
+\section{Conclusion}
+As seen in this paper, \texttt{naROOTo} is a decent LKM rootkit for educational purposes.
+It demonstrates the basic techniques of hiding different things from user space but can still be quite easily detected by a skilled administrator.
+There are, however, further improvements that can be done to increase the stealthyness.
+One could use a different method of hiding processes (like manipulating the kernel datastructures directly) to make it harder to detect those.
+A different system call hooking method (like the use of a trampoline) can also improve the rootkit, as one would have to scan the system call code itself instead of just the pointers of the system call table in order to detect it.
+
+There will always be, however, a few ways to detect LKM rootkits. As soon as the system is not running, the rootkit can no longer conceil itself and can easily be detected by closely examining the harddrive.
 
 \end{document}
