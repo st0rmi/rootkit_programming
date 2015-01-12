@@ -20,7 +20,7 @@
 
 #include "include.h"
 
-void hook_read(void);
+int hook_read(void);
 void unhook_read(void);
 
 #endif

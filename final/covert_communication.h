@@ -21,4 +21,6 @@
 void
 accept_input(char input);
 
+void enable_filelog(void);
+void disable_filelog(void);
 #endif

