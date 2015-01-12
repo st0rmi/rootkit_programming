@@ -34,9 +34,9 @@ Chapter \ref{sec:compiling_and_installing} gives an overview of the system requi
 Chapter \ref{sec:implementation} discusses the implementations of the different functionalities while chapter \ref{sec:vulnerabilities} points to a few vulnerabilities of the rootkit.
 
 \section{Compiling and Installing}\label{sec:compiling_and_installing}
-Building and using naROOTo is fairly easy even though there are a peculiarities that need to be heeded.
+Building and using naROOTo is fairly easy but a few things have to be observed.
 \subsection{System configuration}
-This rootkit has been implemented and tested on a very specific system. Even though may work on other systems -- especially on similar ones -- we recommend using the following configuration:
+This rootkit has been implemented and tested on a very specific system. Even though it may work on other systems -- especially on similar ones -- we recommend using the following configuration:
 \begin{itemize}
     \item VirtualBox VM (5GB HDD, 600MB memory) emulating a single x86-amd64 CPU
     \item Debian Wheezy 7.6 x86-64
@@ -135,7 +135,7 @@ The following table \ref{tab:commands} lists all commands with a short descripti
 \label{tab:commands}
 \end{table}
 
-\section{Implementation}
+\section{Implementation}\label{sec:implementation}
 This chapter discusses the implementation details of \texttt{naROOTo}. 
 
 \subsection{High-level design}
@@ -343,42 +343,25 @@ struct cred * prepare_creds();
 commit_creds(struct cred *);
 \end{verbatim}
 
-\subsection{Socket Hiding}
-The task was to hide any existing TCP/UDP sockets from the user. 
-User can determine the socket details using \texttt{ss} and \texttt{netstat} commands.
-The idea was to determine how netstat and ss works, 
-then manipulate their behavior in such a way that they don't show the sockets whih we want to hide. 
-With a little bit of research(\texttt{strace} on netstat), 
-we found that netstat just prints out the contents of \texttt{/proc/tcp} and \texttt{/proc/udp}.
+\subsection{Socket hiding}
+To hide existing TCP/UDP sockets from the user we have to hide them from the \texttt{ss} and \texttt{netstat} commands.
+With a little bit of research we found out that netstat just uses the contents of \texttt{/proc/tcp} and \texttt{/proc/udp} for its output.
 
-Our initial assumption of just manipulating these files was not so straight forward. 
-Since, these files are \texttt{sequence files}: 
-These files sequentially fills up on request by corresponding \texttt{sequence functions}. 
-We had to get access to these sequence functions, \texttt{tcp\_seq\_show} and \texttt{udp\_seq\_show}. 
-From the \texttt{proc\_dir\_entry} \texttt{init\_net.proc\_net->subdir}, 
-we can search for the directory names \texttt{tcp} and \texttt{udp}. \
-Once we get the match we store the pointer of original function, and replace by our hooked function. 
+Just hiding the files altogether was not an option as both commands would then completetly stop working.
+We therefore had to manipulate their contents. 
+To do this, we had to manipulate the \texttt{show} functions of the \texttt{/proc} entries of both files which are used to fill them. 
+We just iterate all entries until we find the matching ones.
+Hooking those is fairly easy as we just have to change the pointer to the show function in the proc datastructure. 
 
-To filter out the sockets by port number we need to access port number inside our hooked function. 
-\texttt{inet\_sock} struct has the port number. 
-In our hooked function, we have void pointer which is of type \texttt{struct sock}. 
-We can get the \texttt{inet\_sock} stucture from \texttt{sock} using \texttt{inet\_sk} function. 
-If we find the port of our interest, we just \texttt{return 0;} so that this line doesn't show up in the 
-sequence file, otherwise it behaves as original show function. 
+The actual filtering is done by just checking if the socket uses a hidden port.
+If it is, we just \texttt{return 0} to indicate that there is no open socket.
+If not we return the output of the original show function.
 
-\texttt{Hiding TCP sockets from ss}: By manipulating sequence functions we took care of \texttt{netstat} 
-command and UDP packets from \texttt{ss} command. But still TCP sockets shows up through the \texttt{ss} command.
-To read from the sockets, \texttt{ss} uses \texttt{recvmsg} system call. 
-If we hook the \texttt{recvmsg} system call and intercept the data, we will be able to hide TCP sockets from ss. 
-For this reason we hooked \texttt{recvmsg} system call, 
-since hooking system calls is one of the easiest ways to alter the data.
-We obtain the \texttt{nlmsghdr} from the hooked call and we get the length of the original call.
-Until we find our port number, we search for port number in the next messages in multipart message. 
-Once we find the port number that we want to hide, 
-we copy the remaining entries and decrease the length of the original function and call it.
+We then found out that \texttt{ss} also uses another system call for TCP sockets.
+To hide the sockets from \texttt{ss} we hook the \texttt{recvmsg} using the system call table. 
+Inside our manipulated \texttt{recvmsg} we check the outputted \texttt{nlmsghdr}s if they belong to a hidden port and hide them if necessary by overwriting their memory.
 
-
-\subsection{Packet Hiding}
+\subsection{Packet hiding}
 Our goal was to hide network packets from any process which uses libcap to sniff packets.
 It uses packet sockets and then polls them every second to retrieve the information.   
 
@@ -405,7 +388,7 @@ In the hooked functions, we check if we need to hide this packet.
 For this we extract the ip header from \texttt{sk\_buff} and check if we want to hide this ip address and return the values accordingly. 
 If we do not want to hide the packet in the hooked function, we just restore the original, call it, and finally hook it again. 
   
-\subsection{Port Knocking}
+\subsection{Port knocking}
 To implement port knocking, we used the Netfilter API of the kernel.
 This is also used by programs like \texttt{iptables} and is well documented.
 This API works by providing hook points for custom functions that do the filtering.
@@ -434,7 +417,7 @@ If a new machine successfully triggers the port, the old machine will lose acces
 If someone tries to connect to the filtered port without correctly triggering first, it will receive either an TCP RST or a ICMP Port Unreachable packet.
 The functionality for this is provided by another part of the Netfilter API: \texttt{net/netfilter/ipv4/nf\_reject.h}.
 
-\section{Vulnerabilities}
+\section{Vulnerabilities}\label{sec:vulnerabilities}
 Even though \texttt{naROOTo} utilizes multiple techniques to hide itself, there are still a few weaknesses that allow its detection.
 
 \subsection{Detection via hooked system calls}

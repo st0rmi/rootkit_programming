@@ -15,9 +15,9 @@
 \BOOKMARK [2][-]{subsection.4.7}{Keylogging}{section.4}% 15
 \BOOKMARK [2][-]{subsection.4.8}{Command and control}{section.4}% 16
 \BOOKMARK [2][-]{subsection.4.9}{Privilege Escalation}{section.4}% 17
-\BOOKMARK [2][-]{subsection.4.10}{Socket Hiding}{section.4}% 18
-\BOOKMARK [2][-]{subsection.4.11}{Packet Hiding}{section.4}% 19
-\BOOKMARK [2][-]{subsection.4.12}{Port Knocking}{section.4}% 20
+\BOOKMARK [2][-]{subsection.4.10}{Socket hiding}{section.4}% 18
+\BOOKMARK [2][-]{subsection.4.11}{Packet hiding}{section.4}% 19
+\BOOKMARK [2][-]{subsection.4.12}{Port knocking}{section.4}% 20
 \BOOKMARK [1][-]{section.5}{Vulnerabilities}{}% 21
 \BOOKMARK [2][-]{subsection.5.1}{Detection via hooked system calls}{section.5}% 22
 \BOOKMARK [2][-]{subsection.5.2}{Detection via hidden processes}{section.5}% 23
