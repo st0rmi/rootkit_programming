@@ -20,7 +20,16 @@
 
 #include "include.h"
 
-int hook_read(void);
-void unhook_read(void);
+int
+enable_filelog(void);
+
+int
+disable_filelog(void);
+
+int
+hook_read(void);
+
+void
+unhook_read(void);
 
 #endif

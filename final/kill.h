@@ -15,12 +15,13 @@
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
 
-#ifndef NET_KEYLOG_HEADER
-#define NET_KEYLOG_HEADER
+#ifndef KILL_HEADER
+#define KILL_HEADER
 
-void enable_net_keylog(char *);
-void disable_net_keylog(void);
+void
+hook_kill(void);
 
-void send_udp(const char *);
+void
+unhook_kill(void);
 
 #endif

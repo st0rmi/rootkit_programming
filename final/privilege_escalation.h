@@ -18,10 +18,10 @@
 #ifndef PRIVILEGE_HEADER 
 #define PRIVILEGE_HEADER
 
-void
+int
 priv_escalation (void);
 
-void
+int
 priv_deescalation (void);
 
 #endif
