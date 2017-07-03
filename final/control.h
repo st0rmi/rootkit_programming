@@ -107,115 +107,78 @@ struct escalated_pid {
  * Functions for adding and removing certain objects from hiding
  */
 
-int
-is_path_hidden(char *name);
+int is_path_hidden(char *name);
 
-int
-hide_file_path(char *name);
+int hide_file_path(char *name);
 
-int
-unhide_file_path(char *name);
+int unhide_file_path(char *name);
 
-struct list_head *
-get_prefix_list(void);
+struct list_head *get_prefix_list(void);
 
-int
-is_prefix_hidden(char *name);
+int is_prefix_hidden(char *name);
 
-int
-hide_file_prefix(char *name);
+int hide_file_prefix(char *name);
 
-int
-unhide_file_prefix(char *name);
+int unhide_file_prefix(char *name);
 
-int
-is_process_hidden(pid_t pid);
+int is_process_hidden(pid_t pid);
 
-int
-hide_process(pid_t pid);
+int hide_process(pid_t pid);
 
-int
-unhide_process(pid_t pid);
+int unhide_process(pid_t pid);
 
-int
-is_tcp_socket_hidden(int port);
+int is_tcp_socket_hidden(int port);
 
-int
-hide_tcp_socket(int port);
+int hide_tcp_socket(int port);
 
-int
-unhide_tcp_socket(int port);
+int unhide_tcp_socket(int port);
 
-int
-is_udp_socket_hidden(int port);
+int is_udp_socket_hidden(int port);
 
-int
-hide_udp_socket(int port);
+int hide_udp_socket(int port);
 
-int
-unhide_udp_socket(int port);
+int unhide_udp_socket(int port);
 
-int
-is_knocked_tcp(int port);
+int is_knocked_tcp(int port);
 
-int
-enable_knocking_tcp(int port);
+int enable_knocking_tcp(int port);
 
-int
-disable_knocking_tcp(int port);
+int disable_knocking_tcp(int port);
 
-int
-is_knocked_udp(int port);
+int is_knocked_udp(int port);
 
-int
-enable_knocking_udp(int port);
+int enable_knocking_udp(int port);
 
-int
-disable_knocking_udp(int port);
+int disable_knocking_udp(int port);
 
-int
-is_service_hidden(int port);
+int is_service_hidden(int port);
 
-int
-hide_service(int port);
+int hide_service(int port);
 
-int
-unhide_service(int port);
+int unhide_service(int port);
 
-int
-is_ip_hidden(__u32 ipaddr);
+int is_ip_hidden(__u32 ipaddr);
 
-int
-hide_ip_address(__u32 ipaddr);
+int hide_ip_address(__u32 ipaddr);
 
-int
-unhide_ip_address(__u32 ipaddr);
+int unhide_ip_address(__u32 ipaddr);
 
-int
-is_module_hidden(char *name);
+int is_module_hidden(char *name);
 
-int
-hide_module(char *name);
+int hide_module(char *name);
 
-int
-unhide_module(char *name);
+int unhide_module(char *name);
 
-struct escalated_pid *
-is_shell_escalated(pid_t pid);
+struct escalated_pid *is_shell_escalated(pid_t pid);
 
-int
-escalate(struct escalated_pid *);
+int escalate(struct escalated_pid *);
 
-int
-deescalate(pid_t pid);
+int deescalate(pid_t pid);
 
-int
-control_loaded(void);
+int control_loaded(void);
 
-void
-initialize_control(void);
+void initialize_control(void);
 
-void
-cleanup_control(void);
+void cleanup_control(void);
 
 #endif

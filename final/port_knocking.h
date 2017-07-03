@@ -20,10 +20,8 @@
 
 #include "include.h"
 
-int
-load_port_knocking (void);
+int load_port_knocking(void);
 
-void
-unload_port_knocking (void);
+void unload_port_knocking(void);
 
 #endif

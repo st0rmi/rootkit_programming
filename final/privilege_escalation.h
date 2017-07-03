@@ -15,13 +15,11 @@
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
 
-#ifndef PRIVILEGE_HEADER 
+#ifndef PRIVILEGE_HEADER
 #define PRIVILEGE_HEADER
 
-int
-priv_escalation (void);
+int priv_escalation(void);
 
-int
-priv_deescalation (void);
+int priv_deescalation(void);
 
 #endif

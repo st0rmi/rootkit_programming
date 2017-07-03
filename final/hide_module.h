@@ -18,13 +18,10 @@
 #ifndef HIDE_MODULE_HEADER
 #define HIDE_MODULE_HEADER
 
-int
-hide_module_byname (char *);
+int hide_module_byname(char *);
 
-int
-unhide_module_byname (char *);
+int unhide_module_byname(char *);
 
-void
-unhook_modules (void);
+void unhook_modules(void);
 
 #endif

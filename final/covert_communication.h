@@ -18,7 +18,6 @@
 #ifndef COVERTCOM_HEADER
 #define COVERTCOM_HEADER
 
-int
-accept_input(char input);
+int accept_input(char input);
 
 #endif

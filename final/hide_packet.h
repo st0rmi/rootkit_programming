@@ -20,10 +20,8 @@
 
 #include "include.h"
 
-int
-load_packet_hiding (void);
+int load_packet_hiding(void);
 
-void
-unload_packet_hiding (void);
+void unload_packet_hiding(void);
 
 #endif

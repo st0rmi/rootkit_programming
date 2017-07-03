@@ -18,10 +18,8 @@
 #ifndef KILL_HEADER
 #define KILL_HEADER
 
-void
-hook_kill(void);
+void hook_kill(void);
 
-void
-unhook_kill(void);
+void unhook_kill(void);
 
 #endif

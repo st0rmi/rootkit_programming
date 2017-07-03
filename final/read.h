@@ -15,21 +15,17 @@
  * along with naROOTo.  If not, see <http://www.gnu.org/licenses/>. 
  */
 
-#ifndef READ_HEADER 
+#ifndef READ_HEADER
 #define READ_HEADER
 
 #include "include.h"
 
-int
-enable_filelog(void);
+int enable_filelog(void);
 
-int
-disable_filelog(void);
+int disable_filelog(void);
 
-int
-hook_read(void);
+int hook_read(void);
 
-void
-unhook_read(void);
+void unhook_read(void);
 
 #endif

